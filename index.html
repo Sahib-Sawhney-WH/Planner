@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-density="comfortable">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Planner - Local Desktop Productivity</title>
+    <style>
+      /* Prevent flash of unstyled content */
+      body {
+        background: #0E0F12;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      
+      /* Loading screen */
+      #loading {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0E0F12;
+        color: #E6E9EF;
+        font-family: system-ui, -apple-system, sans-serif;
+        z-index: 9999;
+        transition: opacity 300ms ease;
+      }
+      
+      #loading.hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      .loading-content {
+        text-align: center;
+      }
+      
+      .loading-icon {
+        width: 48px;
+        height: 48px;
+        margin: 0 auto 16px;
+        border: 3px solid #242833;
+        border-top-color: #4DA3FF;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      .loading-text {
+        font-size: 14px;
+        color: #AAB2BF;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loading screen -->
+    <div id="loading">
+      <div class="loading-content">
+        <div class="loading-icon"></div>
+        <div class="loading-text">Loading Planner...</div>
+      </div>
+    </div>
+    
+    <!-- React root -->
+    <div id="root"></div>
+    
+    <script>
+      // Hide loading screen when app is ready
+      window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          document.getElementById('loading')?.classList.add('hide');
+        }, 500);
+      });
+      
+      // Apply saved theme immediately
+      const savedTheme = localStorage.getItem('theme') || 'dark';
+      const savedDensity = localStorage.getItem('density') || 'comfortable';
+      const savedAccent = localStorage.getItem('accentColor') || '#4DA3FF';
+      
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      document.documentElement.setAttribute('data-density', savedDensity);
+      document.documentElement.style.setProperty('--accent', savedAccent);
+    </script>
+    
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
