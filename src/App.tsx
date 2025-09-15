@@ -24,8 +24,7 @@ function App() {
     loadProjects,
     theme,
     density,
-    createTask,
-    search
+    createTask
   } = useStore();
 
   // Initialize database and load initial data
@@ -37,13 +36,21 @@ function App() {
       await loadProjects();
     };
     init();
-  }, []);
+  }, [loadClients, loadTasks, loadProjects]); // Added dependencies to useEffect
 
   // Apply theme and density
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-density', density);
   }, [theme, density]);
+
+  // Helper to check if input is focused
+  const isInputFocused = () => {
+    const activeElement = document.activeElement;
+    return activeElement?.tagName === 'INPUT' ||
+           activeElement?.tagName === 'TEXTAREA' ||
+           activeElement?.getAttribute('contenteditable') === 'true';
+  };
 
   // Global keyboard shortcuts
   useHotkeys('ctrl+k, cmd+k', (e) => {
@@ -55,19 +62,19 @@ function App() {
   useHotkeys('n', () => {
     // Quick add task
     createTask({ title: 'New Task', status: 'Inbox' });
-  }, { enabled: !isInputFocused });
+  }, { enabled: !isInputFocused() });
 
   useHotkeys('shift+n', () => {
     // Quick add note
     setView('notes');
-  }, { enabled: !isInputFocused });
+  }, { enabled: !isInputFocused() });
 
-  useHotkeys('g c', () => setView('clients'), { enabled: !isInputFocused });
-  useHotkeys('g p', () => setView('projects'), { enabled: !isInputFocused });
-  useHotkeys('g t', () => setView('tasks'), { enabled: !isInputFocused });
-  useHotkeys('g k', () => setView('knowledge'), { enabled: !isInputFocused });
-  useHotkeys('g o', () => setView('opportunities'), { enabled: !isInputFocused });
-  useHotkeys('g r', () => setView('raid'), { enabled: !isInputFocused });
+  useHotkeys('g c', () => setView('clients'), { enabled: !isInputFocused() });
+  useHotkeys('g p', () => setView('projects'), { enabled: !isInputFocused() });
+  useHotkeys('g t', () => setView('tasks'), { enabled: !isInputFocused() });
+  useHotkeys('g k', () => setView('knowledge'), { enabled: !isInputFocused() });
+  useHotkeys('g o', () => setView('opportunities'), { enabled: !isInputFocused() });
+  useHotkeys('g r', () => setView('raid'), { enabled: !isInputFocused() });
 
   // Render current view
   const renderView = () => {
@@ -102,14 +109,6 @@ function App() {
       {renderView()}
     </Layout>
   );
-}
-
-// Helper to check if input is focused
-function isInputFocused() {
-  const activeElement = document.activeElement;
-  return activeElement?.tagName === 'INPUT' || 
-         activeElement?.tagName === 'TEXTAREA' ||
-         activeElement?.getAttribute('contenteditable') === 'true';
 }
 
 export default App;
