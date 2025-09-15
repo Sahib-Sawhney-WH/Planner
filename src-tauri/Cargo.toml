@@ -1,0 +1,35 @@
+[package]
+name = "planner"
+version = "1.0.0"
+description = "A local-first desktop planner for productivity"
+authors = ["Your Name"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = { version = "1.5", features = [ "process-relaunch", "process-exit",
+  "clipboard-all",
+  "fs-all",
+  "global-shortcut-all",
+  "notification-all",
+  "path-all",
+  "shell-open",
+  "system-tray"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"     # Strip panic cleanup code
+codegen-units = 1   # Compile crates one after another for better optimizations
+lto = true          # Enable link-time optimization
+opt-level = "s"     # Optimize for binary size
+strip = true        # Strip debug symbols
