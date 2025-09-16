@@ -311,24 +311,19 @@ export const useStore = create<Store>((set, get) => ({
     try {
       const db = getDB();
       
-      // Load all data in parallel
-      const [
-        tasks, projects, clients, notes, opportunities, stakeholders,
-        timeEntries, risks, issues, assumptions, dependencies, knowledge
-      ] = await Promise.all([
-        db.select('SELECT * FROM tasks ORDER BY createdAt DESC'),
-        db.select('SELECT * FROM projects ORDER BY createdAt DESC'),
-        db.select('SELECT * FROM clients ORDER BY name'),
-        db.select('SELECT * FROM notes ORDER BY createdAt DESC'),
-        db.select('SELECT * FROM opportunities ORDER BY createdAt DESC'),
-        db.select('SELECT * FROM stakeholders ORDER BY name'),
-        db.select('SELECT * FROM timeEntries ORDER BY date DESC'),
-        db.select('SELECT * FROM risks ORDER BY createdAt DESC'),
-        db.select('SELECT * FROM issues ORDER BY createdAt DESC'),
-        db.select('SELECT * FROM assumptions ORDER BY createdAt DESC'),
-        db.select('SELECT * FROM dependencies ORDER BY createdAt DESC'),
-        db.select('SELECT * FROM knowledge ORDER BY createdAt DESC')
-      ]);
+      // Fixed: Use better-sqlite3 API instead of db.select()
+      const tasks = db.prepare('SELECT * FROM tasks ORDER BY createdAt DESC').all();
+      const projects = db.prepare('SELECT * FROM projects ORDER BY createdAt DESC').all();
+      const clients = db.prepare('SELECT * FROM clients ORDER BY name').all();
+      const notes = db.prepare('SELECT * FROM notes ORDER BY createdAt DESC').all();
+      const opportunities = db.prepare('SELECT * FROM opportunities ORDER BY createdAt DESC').all();
+      const stakeholders = db.prepare('SELECT * FROM stakeholders ORDER BY name').all();
+      const timeEntries = db.prepare('SELECT * FROM timeEntries ORDER BY date DESC').all();
+      const risks = db.prepare('SELECT * FROM risks ORDER BY createdAt DESC').all();
+      const issues = db.prepare('SELECT * FROM issues ORDER BY createdAt DESC').all();
+      const assumptions = db.prepare('SELECT * FROM assumptions ORDER BY createdAt DESC').all();
+      const dependencies = db.prepare('SELECT * FROM dependencies ORDER BY createdAt DESC').all();
+      const knowledge = db.prepare('SELECT * FROM knowledge ORDER BY createdAt DESC').all();
       
       // Parse JSON fields
       const parseJsonField = (items: any[], field: string) => 
@@ -381,11 +376,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO tasks (id, title, description, status, priority, impact, confidence, ease, score, due, clientId, projectId, isNextStep, tags, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [task.id, task.title, task.description, task.status, task.priority, task.impact, task.confidence, task.ease, task.score, task.due, task.clientId, task.projectId, task.isNextStep, JSON.stringify(task.tags), task.createdAt, task.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(task.id, task.title, task.description, task.status, task.priority, task.impact, task.confidence, task.ease, task.score, task.due, task.clientId, task.projectId, task.isNextStep, JSON.stringify(task.tags), task.createdAt, task.updatedAt);
     
     get().loadData();
     return task;
@@ -407,14 +402,16 @@ export const useStore = create<Store>((set, get) => ({
       Array.isArray(value) ? JSON.stringify(value) : value
     );
     
-    await db.execute(`UPDATE tasks SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE tasks SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().tasks.find(t => t.id === id)!;
   },
   
   deleteTask: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM tasks WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -428,7 +425,8 @@ export const useStore = create<Store>((set, get) => ({
         Array.isArray(value) ? JSON.stringify(value) : value
       );
       
-      await db.execute(`UPDATE tasks SET ${fields} WHERE id = ?`, [...values, id]);
+      // Fixed: Use better-sqlite3 API instead of db.execute()
+      db.prepare(`UPDATE tasks SET ${fields} WHERE id = ?`).run(...values, id);
     }
     
     get().loadData();
@@ -451,11 +449,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO projects (id, title, description, clientId, kind, dueDate, tags, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [project.id, project.title, project.description, project.clientId, project.kind, project.dueDate, JSON.stringify(project.tags), project.createdAt, project.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(project.id, project.title, project.description, project.clientId, project.kind, project.dueDate, JSON.stringify(project.tags), project.createdAt, project.updatedAt);
     
     get().loadData();
     return project;
@@ -470,14 +468,16 @@ export const useStore = create<Store>((set, get) => ({
       Array.isArray(value) ? JSON.stringify(value) : value
     );
     
-    await db.execute(`UPDATE projects SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE projects SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().projects.find(p => p.id === id)!;
   },
   
   deleteProject: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM projects WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM projects WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -486,7 +486,7 @@ export const useStore = create<Store>((set, get) => ({
     const db = getDB();
     const client = {
       id: generateId(),
-      name: data.name || '',
+      title: data.name || '',
       industry: data.industry,
       website: data.website,
       phone: data.phone,
@@ -498,11 +498,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO clients (id, name, industry, website, phone, email, address, isKeyAccount, tags, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [client.id, client.name, client.industry, client.website, client.phone, client.email, client.address, client.isKeyAccount, JSON.stringify(client.tags), client.createdAt, client.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(client.id, client.name, client.industry, client.website, client.phone, client.email, client.address, client.isKeyAccount, JSON.stringify(client.tags), client.createdAt, client.updatedAt);
     
     get().loadData();
     return client;
@@ -517,14 +517,16 @@ export const useStore = create<Store>((set, get) => ({
       Array.isArray(value) ? JSON.stringify(value) : value
     );
     
-    await db.execute(`UPDATE clients SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE clients SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().clients.find(c => c.id === id)!;
   },
   
   deleteClient: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM clients WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM clients WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -543,11 +545,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO notes (id, title, content, clientId, projectId, linkedTasks, tags, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [note.id, note.title, note.content, note.clientId, note.projectId, JSON.stringify(note.linkedTasks), JSON.stringify(note.tags), note.createdAt, note.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(note.id, note.title, note.content, note.clientId, note.projectId, JSON.stringify(note.linkedTasks), JSON.stringify(note.tags), note.createdAt, note.updatedAt);
     
     get().loadData();
     return note;
@@ -562,14 +564,16 @@ export const useStore = create<Store>((set, get) => ({
       Array.isArray(value) ? JSON.stringify(value) : value
     );
     
-    await db.execute(`UPDATE notes SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE notes SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().notes.find(n => n.id === id)!;
   },
   
   deleteNote: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM notes WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM notes WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -591,11 +595,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO opportunities (id, title, description, clientId, projectId, stage, value, probability, expectedCloseDate, tags, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [opportunity.id, opportunity.title, opportunity.description, opportunity.clientId, opportunity.projectId, opportunity.stage, opportunity.value, opportunity.probability, opportunity.expectedCloseDate, JSON.stringify(opportunity.tags), opportunity.createdAt, opportunity.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(opportunity.id, opportunity.title, opportunity.description, opportunity.clientId, opportunity.projectId, opportunity.stage, opportunity.value, opportunity.probability, opportunity.expectedCloseDate, JSON.stringify(opportunity.tags), opportunity.createdAt, opportunity.updatedAt);
     
     get().loadData();
     return opportunity;
@@ -610,14 +614,16 @@ export const useStore = create<Store>((set, get) => ({
       Array.isArray(value) ? JSON.stringify(value) : value
     );
     
-    await db.execute(`UPDATE opportunities SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE opportunities SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().opportunities.find(o => o.id === id)!;
   },
   
   deleteOpportunity: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM opportunities WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM opportunities WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -638,11 +644,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO risks (id, title, description, impact, probability, status, owner, dueDate, mitigation, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [risk.id, risk.title, risk.description, risk.impact, risk.probability, risk.status, risk.owner, risk.dueDate, risk.mitigation, risk.createdAt, risk.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(risk.id, risk.title, risk.description, risk.impact, risk.probability, risk.status, risk.owner, risk.dueDate, risk.mitigation, risk.createdAt, risk.updatedAt);
     
     get().loadData();
     return risk;
@@ -655,14 +661,16 @@ export const useStore = create<Store>((set, get) => ({
     const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
     const values = Object.values(updates);
     
-    await db.execute(`UPDATE risks SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE risks SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().risks.find(r => r.id === id)!;
   },
   
   deleteRisk: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM risks WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM risks WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -681,11 +689,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO issues (id, title, description, priority, status, owner, dueDate, resolution, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [issue.id, issue.title, issue.description, issue.priority, issue.status, issue.owner, issue.dueDate, issue.resolution, issue.createdAt, issue.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(issue.id, issue.title, issue.description, issue.priority, issue.status, issue.owner, issue.dueDate, issue.resolution, issue.createdAt, issue.updatedAt);
     
     get().loadData();
     return issue;
@@ -698,14 +706,16 @@ export const useStore = create<Store>((set, get) => ({
     const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
     const values = Object.values(updates);
     
-    await db.execute(`UPDATE issues SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE issues SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().issues.find(i => i.id === id)!;
   },
   
   deleteIssue: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM issues WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM issues WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -724,11 +734,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO assumptions (id, title, description, priority, status, owner, dueDate, validation, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [assumption.id, assumption.title, assumption.description, assumption.priority, assumption.status, assumption.owner, assumption.dueDate, assumption.validation, assumption.createdAt, assumption.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(assumption.id, assumption.title, assumption.description, assumption.priority, assumption.status, assumption.owner, assumption.dueDate, assumption.validation, assumption.createdAt, assumption.updatedAt);
     
     get().loadData();
     return assumption;
@@ -741,14 +751,16 @@ export const useStore = create<Store>((set, get) => ({
     const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
     const values = Object.values(updates);
     
-    await db.execute(`UPDATE assumptions SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE assumptions SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().assumptions.find(a => a.id === id)!;
   },
   
   deleteAssumption: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM assumptions WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM assumptions WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -767,11 +779,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO dependencies (id, title, description, priority, status, owner, dueDate, resolution, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [dependency.id, dependency.title, dependency.description, dependency.priority, dependency.status, dependency.owner, dependency.dueDate, dependency.resolution, dependency.createdAt, dependency.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(dependency.id, dependency.title, dependency.description, dependency.priority, dependency.status, dependency.owner, dependency.dueDate, dependency.resolution, dependency.createdAt, dependency.updatedAt);
     
     get().loadData();
     return dependency;
@@ -784,14 +796,16 @@ export const useStore = create<Store>((set, get) => ({
     const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
     const values = Object.values(updates);
     
-    await db.execute(`UPDATE dependencies SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE dependencies SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().dependencies.find(d => d.id === id)!;
   },
   
   deleteDependency: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM dependencies WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM dependencies WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -809,11 +823,11 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO knowledge (id, title, content, category, tags, isPublic, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [knowledge.id, knowledge.title, knowledge.content, knowledge.category, JSON.stringify(knowledge.tags), knowledge.isPublic, knowledge.createdAt, knowledge.updatedAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(knowledge.id, knowledge.title, knowledge.content, knowledge.category, JSON.stringify(knowledge.tags), knowledge.isPublic, knowledge.createdAt, knowledge.updatedAt);
     
     get().loadData();
     return knowledge;
@@ -828,14 +842,16 @@ export const useStore = create<Store>((set, get) => ({
       Array.isArray(value) ? JSON.stringify(value) : value
     );
     
-    await db.execute(`UPDATE knowledge SET ${fields} WHERE id = ?`, [...values, id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(`UPDATE knowledge SET ${fields} WHERE id = ?`).run(...values, id);
     get().loadData();
     return get().knowledge.find(k => k.id === id)!;
   },
   
   deleteKnowledge: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM knowledge WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM knowledge WHERE id = ?').run(id);
     get().loadData();
   },
   
@@ -851,11 +867,11 @@ export const useStore = create<Store>((set, get) => ({
       createdAt: new Date().toISOString()
     };
     
-    await db.execute(
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare(
       `INSERT INTO timeEntries (id, taskId, duration, description, date, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [entry.id, entry.taskId, entry.duration, entry.description, entry.date, entry.createdAt]
-    );
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(entry.id, entry.taskId, entry.duration, entry.description, entry.date, entry.createdAt);
     
     get().loadData();
     return entry;
@@ -865,7 +881,8 @@ export const useStore = create<Store>((set, get) => ({
   
   deleteTimeEntry: async (id) => {
     const db = getDB();
-    await db.execute('DELETE FROM timeEntries WHERE id = ?', [id]);
+    // Fixed: Use better-sqlite3 API instead of db.execute()
+    db.prepare('DELETE FROM timeEntries WHERE id = ?').run(id);
     get().loadData();
   },
   
