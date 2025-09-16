@@ -311,19 +311,19 @@ export const useStore = create<Store>((set, get) => ({
     try {
       const db = getDB();
       
-      // Fixed: Use better-sqlite3 API instead of db.select()
-      const tasks = db.prepare('SELECT * FROM tasks ORDER BY createdAt DESC').all();
-      const projects = db.prepare('SELECT * FROM projects ORDER BY createdAt DESC').all();
-      const clients = db.prepare('SELECT * FROM clients ORDER BY name').all();
-      const notes = db.prepare('SELECT * FROM notes ORDER BY createdAt DESC').all();
-      const opportunities = db.prepare('SELECT * FROM opportunities ORDER BY createdAt DESC').all();
-      const stakeholders = db.prepare('SELECT * FROM stakeholders ORDER BY name').all();
-      const timeEntries = db.prepare('SELECT * FROM timeEntries ORDER BY date DESC').all();
-      const risks = db.prepare('SELECT * FROM risks ORDER BY createdAt DESC').all();
-      const issues = db.prepare('SELECT * FROM issues ORDER BY createdAt DESC').all();
-      const assumptions = db.prepare('SELECT * FROM assumptions ORDER BY createdAt DESC').all();
-      const dependencies = db.prepare('SELECT * FROM dependencies ORDER BY createdAt DESC').all();
-      const knowledge = db.prepare('SELECT * FROM knowledge ORDER BY createdAt DESC').all();
+      // Fixed: Use better-sqlite3 API with proper type casting
+      const tasks = db.prepare('SELECT * FROM tasks ORDER BY createdAt DESC').all() as Task[];
+      const projects = db.prepare('SELECT * FROM projects ORDER BY createdAt DESC').all() as Project[];
+      const clients = db.prepare('SELECT * FROM clients ORDER BY name').all() as Client[];
+      const notes = db.prepare('SELECT * FROM notes ORDER BY createdAt DESC').all() as Note[];
+      const opportunities = db.prepare('SELECT * FROM opportunities ORDER BY createdAt DESC').all() as Opportunity[];
+      const stakeholders = db.prepare('SELECT * FROM stakeholders ORDER BY name').all() as Stakeholder[];
+      const timeEntries = db.prepare('SELECT * FROM timeEntries ORDER BY date DESC').all() as TimeEntry[];
+      const risks = db.prepare('SELECT * FROM risks ORDER BY createdAt DESC').all() as Risk[];
+      const issues = db.prepare('SELECT * FROM issues ORDER BY createdAt DESC').all() as Issue[];
+      const assumptions = db.prepare('SELECT * FROM assumptions ORDER BY createdAt DESC').all() as Assumption[];
+      const dependencies = db.prepare('SELECT * FROM dependencies ORDER BY createdAt DESC').all() as Dependency[];
+      const knowledge = db.prepare('SELECT * FROM knowledge ORDER BY createdAt DESC').all() as Knowledge[];
       
       // Parse JSON fields
       const parseJsonField = (items: any[], field: string) => 
@@ -486,7 +486,7 @@ export const useStore = create<Store>((set, get) => ({
     const db = getDB();
     const client = {
       id: generateId(),
-      title: data.name || '',
+      name: data.name || '', // Fixed: Use 'name' instead of 'title'
       industry: data.industry,
       website: data.website,
       phone: data.phone,
