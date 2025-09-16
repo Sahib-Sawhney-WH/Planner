@@ -1,7 +1,15 @@
+// src/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/globals.css';
+
+// Extend Window interface to include Tauri
+declare global {
+  interface Window {
+    __TAURI__?: any;
+  }
+}
 
 // Initialize app
 async function init() {

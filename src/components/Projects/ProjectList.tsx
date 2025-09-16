@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Briefcase, Plus, Calendar, Target, AlertCircle,
-  Clock, Users, ChevronRight, Activity, Layers
+  Briefcase, Plus, Target
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import dayjs from 'dayjs';
@@ -12,8 +11,6 @@ export default function ProjectList() {
     clients,
     tasks,
     createProject,
-    updateProject,
-    deleteProject,
     projectFilter,
     setProjectFilter,
     openDrawer
@@ -76,7 +73,7 @@ export default function ProjectList() {
       <div
         key={project.id}
         className="card hover:shadow-lg transition-all cursor-pointer"
-        onClick={() => openDrawer(project)}
+        onClick={() => openDrawer(project, 'project')}
       >
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
@@ -185,7 +182,7 @@ export default function ProjectList() {
                     <div
                       key={project.id}
                       className="flex items-center gap-4 p-3 rounded-lg hover:bg-elevated transition-all cursor-pointer"
-                      onClick={() => openDrawer(project)}
+                      onClick={() => openDrawer(project, 'project')}
                     >
                       <div className="w-3 h-3 bg-[var(--accent)] rounded-full -ml-[1.375rem]" />
                       <div className="flex-1">
@@ -248,16 +245,13 @@ export default function ProjectList() {
             <select
               className="input"
               value={projectFilter.kind || ''}
-              onChange={(e) => setProjectFilter({ 
-                kind: e.target.value as 'Active' | 'Planned' || undefined 
-              })}
+              onChange={(e) => setProjectFilter({ ...projectFilter, kind: e.target.value as any })}
             >
               <option value="">All Projects</option>
               <option value="Active">Active</option>
               <option value="Planned">Planned</option>
             </select>
 
-            {/* Add project */}
             <button
               onClick={() => setShowAddModal(true)}
               className="btn flex items-center gap-2"
@@ -268,38 +262,23 @@ export default function ProjectList() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => setProjectFilter({ kind: 'Active' })}
-            className={`pb-2 border-b-2 transition-colors ${
-              projectFilter.kind === 'Active'
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-transparent'
-            }`}
-          >
-            Active ({projects.filter(p => p.kind === 'Active').length})
-          </button>
-          <button
-            onClick={() => setProjectFilter({ kind: 'Planned' })}
-            className={`pb-2 border-b-2 transition-colors ${
-              projectFilter.kind === 'Planned'
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-transparent'
-            }`}
-          >
-            Planned ({projects.filter(p => p.kind === 'Planned').length})
-          </button>
-          <button
-            onClick={() => setProjectFilter({})}
-            className={`pb-2 border-b-2 transition-colors ${
-              !projectFilter.kind
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-transparent'
-            }`}
-          >
-            All ({projects.length})
-          </button>
+        {/* Summary stats */}
+        <div className="flex items-center gap-6 text-sm">
+          <span className="text-muted">
+            <span className="font-medium text-[var(--text)]">
+              {projects.filter(p => p.kind === 'Active').length}
+            </span> Active
+          </span>
+          <span className="text-muted">
+            <span className="font-medium text-[var(--text)]">
+              {projects.filter(p => p.kind === 'Planned').length}
+            </span> Planned
+          </span>
+          <span className="text-muted">
+            <span className="font-medium text-[var(--text)]">
+              {projects.filter(p => p.status === 'At Risk').length}
+            </span> At Risk
+          </span>
         </div>
       </div>
 
@@ -307,9 +286,7 @@ export default function ProjectList() {
       <div className="flex-1 overflow-auto p-6">
         {viewMode === 'cards' ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {projects
-              .filter(p => !projectFilter.kind || p.kind === projectFilter.kind)
-              .map(renderProjectCard)}
+            {projects.map(project => renderProjectCard(project))}
           </div>
         ) : (
           renderTimeline()
@@ -332,71 +309,69 @@ export default function ProjectList() {
       {/* Add project modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="card w-[600px] p-6 animate-slideDown">
-            <h2 className="text-lg font-semibold mb-4">Create New Project</h2>
+          <div className="card w-[500px] p-6 animate-slideDown">
+            <h2 className="text-lg font-semibold mb-4">New Project</h2>
             
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="label">Project Title</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Enter project name..."
-                  value={newProject.title}
-                  onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
-                  autoFocus
-                />
-              </div>
-              
-              <div>
-                <label className="label">Client</label>
-                <select
-                  className="input"
-                  value={newProject.clientId}
-                  onChange={(e) => setNewProject({ ...newProject, clientId: e.target.value })}
+            <div className="mb-4">
+              <label className="label">Project Title</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Enter project title..."
+                value={newProject.title}
+                onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
+                autoFocus
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="label">Client</label>
+              <select
+                className="input"
+                value={newProject.clientId}
+                onChange={(e) => setNewProject({ ...newProject, clientId: e.target.value })}
+              >
+                <option value="">Personal Project</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>{client.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-4">
+              <label className="label">Type</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setNewProject({ ...newProject, kind: 'Planned' })}
+                  className={`flex-1 p-2 rounded border transition-colors ${
+                    newProject.kind === 'Planned'
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                      : 'border-[var(--border)]'
+                  }`}
                 >
-                  <option value="">Personal/Internal</option>
-                  {clients.map(client => (
-                    <option key={client.id} value={client.id}>{client.name}</option>
-                  ))}
-                </select>
+                  Planned
+                </button>
+                <button
+                  onClick={() => setNewProject({ ...newProject, kind: 'Active' })}
+                  className={`flex-1 p-2 rounded border transition-colors ${
+                    newProject.kind === 'Active'
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                      : 'border-[var(--border)]'
+                  }`}
+                >
+                  Active
+                </button>
               </div>
             </div>
 
             <div className="mb-4">
               <label className="label">Description</label>
               <textarea
-                className="input min-h-[100px]"
-                placeholder="Project description..."
+                className="input min-h-[80px]"
+                placeholder="Brief project description..."
                 value={newProject.description}
                 onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
               />
-            </div>
-
-            <div className="mb-4">
-              <label className="label">Project Type</label>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setNewProject({ ...newProject, kind: 'Active' })}
-                  className={`px-4 py-2 rounded-lg border transition-colors ${
-                    newProject.kind === 'Active'
-                      ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                      : 'border-[var(--border)]'
-                  }`}
-                >
-                  Active
-                </button>
-                <button
-                  onClick={() => setNewProject({ ...newProject, kind: 'Planned' })}
-                  className={`px-4 py-2 rounded-lg border transition-colors ${
-                    newProject.kind === 'Planned'
-                      ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                      : 'border-[var(--border)]'
-                  }`}
-                >
-                  Planned
-                </button>
-              </div>
             </div>
 
             <div className="flex justify-end gap-2">
@@ -428,3 +403,4 @@ export default function ProjectList() {
     </div>
   );
 }
+

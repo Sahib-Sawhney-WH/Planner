@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
-  TrendingUp, Plus, DollarSign, Target, Calendar,
+  TrendingUp, Plus, DollarSign, Target,
   ChevronRight, AlertCircle, CheckCircle, XCircle,
-  BarChart3, Users, Percent
+  BarChart3, Users
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import dayjs from 'dayjs';
@@ -13,7 +13,6 @@ export default function OpportunityPipeline() {
     clients,
     createOpportunity,
     updateOpportunity,
-    deleteOpportunity,
     openDrawer
   } = useStore();
 
@@ -112,7 +111,7 @@ export default function OpportunityPipeline() {
         draggable={draggable && !opp.stage.includes('Closed')}
         onDragStart={draggable ? (e) => handleDragStart(e, opp.id) : undefined}
         className="card p-3 cursor-pointer hover:shadow-lg transition-all"
-        onClick={() => openDrawer(opp)}
+        onClick={() => openDrawer(opp, 'opportunity')}
       >
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1">
@@ -272,7 +271,7 @@ export default function OpportunityPipeline() {
                 <div
                   key={opp.id}
                   className="row cursor-pointer"
-                  onClick={() => openDrawer(opp)}
+                  onClick={() => openDrawer(opp, 'opportunity')}
                 >
                   <div className={`w-1 h-8 rounded ${stage?.color}`} />
                   <div className="flex-1">
@@ -437,3 +436,4 @@ export default function OpportunityPipeline() {
     </div>
   );
 }
+

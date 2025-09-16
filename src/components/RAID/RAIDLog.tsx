@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   AlertTriangle, Shield, AlertCircle, CheckCircle,
-  Plus, Filter, ChevronDown, User, Calendar, TrendingUp
+  Plus, User
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import dayjs from 'dayjs';
@@ -17,13 +17,9 @@ export default function RAIDLog() {
     clients,
     projects,
     createRisk,
-    updateRisk,
     createIssue,
-    updateIssue,
     createAssumption,
-    updateAssumption,
     createDecision,
-    updateDecision,
     openDrawer
   } = useStore();
 
@@ -119,7 +115,7 @@ export default function RAIDLog() {
             <div
               key={risk.id}
               className="card hover:shadow-lg transition-all cursor-pointer"
-              onClick={() => openDrawer(risk)}
+              onClick={() => openDrawer(risk, 'risk')}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
@@ -153,7 +149,6 @@ export default function RAIDLog() {
                   </span>
                   {risk.due && (
                     <span className="flex items-center gap-1 text-muted">
-                      <Calendar size={14} />
                       {dayjs(risk.due).format('MMM D')}
                     </span>
                   )}
@@ -196,7 +191,7 @@ export default function RAIDLog() {
             <div
               key={issue.id}
               className="card hover:shadow-lg transition-all cursor-pointer"
-              onClick={() => openDrawer(issue)}
+              onClick={() => openDrawer(issue, 'issue')}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
@@ -264,7 +259,7 @@ export default function RAIDLog() {
             <div
               key={assumption.id}
               className="card hover:shadow-lg transition-all cursor-pointer"
-              onClick={() => openDrawer(assumption)}
+              onClick={() => openDrawer(assumption, 'assumption')}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
@@ -325,7 +320,7 @@ export default function RAIDLog() {
             <div
               key={decision.id}
               className="card hover:shadow-lg transition-all cursor-pointer"
-              onClick={() => openDrawer(decision)}
+              onClick={() => openDrawer(decision, 'decision')}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
@@ -383,32 +378,29 @@ export default function RAIDLog() {
       {/* Header */}
       <div className="px-6 py-4 border-b border-default">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold flex items-center gap-2">
-            <AlertTriangle size={24} />
-            RAID Log
-          </h1>
-
+          <h1 className="text-xl font-semibold">RAID Log</h1>
+          
           <div className="flex items-center gap-3">
             {/* Filters */}
             <select
-              className="input text-sm"
-              value={filterClient}
-              onChange={(e) => setFilterClient(e.target.value)}
-            >
-              <option value="">All Clients</option>
-              {clients.map(client => (
-                <option key={client.id} value={client.id}>{client.name}</option>
-              ))}
-            </select>
-
-            <select
-              className="input text-sm"
+              className="input"
               value={filterProject}
               onChange={(e) => setFilterProject(e.target.value)}
             >
               <option value="">All Projects</option>
               {projects.map(project => (
                 <option key={project.id} value={project.id}>{project.title}</option>
+              ))}
+            </select>
+
+            <select
+              className="input"
+              value={filterClient}
+              onChange={(e) => setFilterClient(e.target.value)}
+            >
+              <option value="">All Clients</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>{client.name}</option>
               ))}
             </select>
 
@@ -423,22 +415,26 @@ export default function RAIDLog() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-1 bg-elevated rounded-lg p-1">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as RAIDType)}
-                className={`pb-2 border-b-2 transition-colors flex items-center gap-2 ${
-                  activeTab === tab.id
-                    ? 'border-[var(--accent)] text-[var(--accent)]'
-                    : 'border-transparent'
+                className={`flex items-center gap-2 px-4 py-2 rounded transition-colors ${
+                  activeTab === tab.id 
+                    ? 'bg-[var(--accent)] text-white' 
+                    : 'hover:bg-[var(--ring)]'
                 }`}
               >
-                <Icon size={16} className={tab.color} />
-                {tab.label}
-                <span className="text-xs bg-[var(--ring)] px-1.5 py-0.5 rounded-full">
+                <Icon size={16} className={activeTab === tab.id ? '' : tab.color} />
+                <span>{tab.label}</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  activeTab === tab.id 
+                    ? 'bg-white/20' 
+                    : 'bg-[var(--ring)]'
+                }`}>
                   {tab.count}
                 </span>
               </button>
@@ -458,17 +454,17 @@ export default function RAIDLog() {
       {/* Add modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="card w-[600px] p-6 animate-slideDown max-h-[80vh] overflow-y-auto">
+          <div className="card w-[600px] p-6 animate-slideDown">
             <h2 className="text-lg font-semibold mb-4">Add RAID Item</h2>
             
             <div className="mb-4">
               <label className="label">Type</label>
               <div className="grid grid-cols-4 gap-2">
-                {['risk', 'issue', 'assumption', 'decision'].map(type => (
+                {['risk', 'assumption', 'issue', 'decision'].map(type => (
                   <button
                     key={type}
                     onClick={() => setNewItem({ ...newItem, type })}
-                    className={`p-2 rounded-lg border capitalize transition-colors ${
+                    className={`p-2 rounded border transition-colors capitalize ${
                       newItem.type === type
                         ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
                         : 'border-[var(--border)]'
@@ -480,21 +476,28 @@ export default function RAIDLog() {
               </div>
             </div>
 
+            <div className="mb-4">
+              <label className="label">Title</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Enter title..."
+                value={newItem.title}
+                onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="label">Description</label>
+              <textarea
+                className="input min-h-[80px]"
+                placeholder="Enter description..."
+                value={newItem.description}
+                onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="label">Client</label>
-                <select
-                  className="input"
-                  value={newItem.clientId}
-                  onChange={(e) => setNewItem({ ...newItem, clientId: e.target.value })}
-                >
-                  <option value="">Select client...</option>
-                  {clients.map(client => (
-                    <option key={client.id} value={client.id}>{client.name}</option>
-                  ))}
-                </select>
-              </div>
-              
               <div>
                 <label className="label">Project</label>
                 <select
@@ -508,96 +511,46 @@ export default function RAIDLog() {
                   ))}
                 </select>
               </div>
-            </div>
 
-            <div className="mb-4">
-              <label className="label">Title</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="Brief title..."
-                value={newItem.title}
-                onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="label">
-                {newItem.type === 'decision' ? 'Decision' : 'Description'}
-              </label>
-              <textarea
-                className="input min-h-[80px]"
-                placeholder={
-                  newItem.type === 'decision' 
-                    ? 'What was decided...'
-                    : 'Detailed description...'
-                }
-                value={newItem.type === 'decision' ? newItem.decisionText : newItem.description}
-                onChange={(e) => setNewItem({ 
-                  ...newItem, 
-                  [newItem.type === 'decision' ? 'decisionText' : 'description']: e.target.value 
-                })}
-              />
+              <div>
+                <label className="label">Client</label>
+                <select
+                  className="input"
+                  value={newItem.clientId}
+                  onChange={(e) => setNewItem({ ...newItem, clientId: e.target.value })}
+                >
+                  <option value="">Select client...</option>
+                  {clients.map(client => (
+                    <option key={client.id} value={client.id}>{client.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {(newItem.type === 'risk' || newItem.type === 'issue') && (
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="label">Severity</label>
-                  <select
-                    className="input"
-                    value={newItem.severity}
-                    onChange={(e) => setNewItem({ ...newItem, severity: e.target.value })}
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                  </select>
-                </div>
-                
-                {newItem.type === 'risk' && (
-                  <div>
-                    <label className="label">Likelihood</label>
-                    <select
-                      className="input"
-                      value={newItem.likelihood}
-                      onChange={(e) => setNewItem({ ...newItem, likelihood: e.target.value })}
+              <div className="mb-4">
+                <label className="label">Severity</label>
+                <div className="flex gap-2">
+                  {['Low', 'Medium', 'High'].map(severity => (
+                    <button
+                      key={severity}
+                      onClick={() => setNewItem({ ...newItem, severity })}
+                      className={`flex-1 p-2 rounded border transition-colors ${
+                        newItem.severity === severity
+                          ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                          : 'border-[var(--border)]'
+                      }`}
                     >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                    </select>
-                  </div>
-                )}
+                      {severity}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
-            <div className="mb-4">
-              <label className="label">Owner</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="Responsible person..."
-                value={newItem.owner}
-                onChange={(e) => setNewItem({ ...newItem, owner: e.target.value })}
-              />
-            </div>
-
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setNewItem({
-                    type: 'risk',
-                    title: '',
-                    description: '',
-                    severity: 'Medium',
-                    likelihood: 'Medium',
-                    owner: '',
-                    projectId: '',
-                    clientId: ''
-                  });
-                }}
+                onClick={() => setShowAddModal(false)}
                 className="btn btn-ghost"
               >
                 Cancel
@@ -616,3 +569,4 @@ export default function RAIDLog() {
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Clock, AlertCircle, CheckCircle, Calendar, TrendingUp, 
+  Clock, AlertCircle, Calendar, TrendingUp, 
   Users, Briefcase, Target, ChevronRight, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
@@ -171,7 +171,7 @@ export default function ConsultantHome() {
                   <div 
                     key={task.id}
                     className="row cursor-pointer"
-                    onClick={() => openDrawer(task)}
+                    onClick={() => openDrawer(task, 'task')}
                   >
                     <input
                       type="checkbox"
@@ -336,3 +336,4 @@ export default function ConsultantHome() {
     </div>
   );
 }
+

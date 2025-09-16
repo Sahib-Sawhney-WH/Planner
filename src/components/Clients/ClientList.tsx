@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Users, Plus, Search, Building2, Phone, Mail,
-  Globe, ChevronRight, MapPin, Clock, Star
+  Globe, Star
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import dayjs from 'dayjs';
@@ -14,7 +14,6 @@ export default function ClientList() {
     opportunities,
     stakeholders,
     createClient,
-    updateClient,
     openDrawer
   } = useStore();
 
@@ -148,7 +147,7 @@ export default function ClientList() {
               <div
                 key={client.id}
                 className="card hover:shadow-lg transition-all cursor-pointer"
-                onClick={() => openDrawer(client)}
+                onClick={() => openDrawer(client, 'client')}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
