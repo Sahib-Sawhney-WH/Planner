@@ -1,18 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   TrendingUp, Plus, DollarSign, Target,
-  ChevronRight, AlertCircle, CheckCircle, XCircle,
+  AlertCircle, CheckCircle, XCircle,
   BarChart3, Users
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import dayjs from 'dayjs';
+import dayjs from '../../lib/dayjs-config';
 
 export default function OpportunityPipeline() {
   const {
     opportunities,
     clients,
     createOpportunity,
-    updateOpportunity,
     openDrawer
   } = useStore();
 
@@ -20,12 +19,12 @@ export default function OpportunityPipeline() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newOpp, setNewOpp] = useState({
     clientId: '',
-    name: '',
+    title: '',
     stage: 'Discovery' as any,
-    amount: 0,
-    probability: 0.5,
+    value: 0,
+    probability: 50,
     nextStep: '',
-    nextStepDue: '',
+    expectedCloseDate: '',
     notes: ''
   });
 
@@ -47,15 +46,15 @@ export default function OpportunityPipeline() {
   // Calculate metrics
   const totalPipeline = opportunities
     .filter(o => !o.stage.includes('Closed'))
-    .reduce((sum, o) => sum + (o.amount || 0), 0);
+    .reduce((sum, o) => sum + (o.value || 0), 0);
   
   const weightedPipeline = opportunities
     .filter(o => !o.stage.includes('Closed'))
-    .reduce((sum, o) => sum + (o.amount || 0) * o.probability, 0);
+    .reduce((sum, o) => sum + (o.value || 0) * (o.probability / 100), 0);
   
   const closedWon = opportunities
     .filter(o => o.stage === 'Closed Won')
-    .reduce((sum, o) => sum + (o.amount || 0), 0);
+    .reduce((sum, o) => sum + (o.value || 0), 0);
   
   const winRate = opportunities.filter(o => o.stage.includes('Closed')).length > 0
     ? (opportunities.filter(o => o.stage === 'Closed Won').length / 
@@ -66,356 +65,274 @@ export default function OpportunityPipeline() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
-  const handleCreateOpportunity = () => {
-    if (newOpp.name.trim() && newOpp.clientId) {
-      createOpportunity(newOpp);
+  const handleCreateOpportunity = async () => {
+    if (newOpp.title.trim()) {
+      await createOpportunity({
+        title: newOpp.title,
+        clientId: newOpp.clientId || undefined,
+        stage: newOpp.stage,
+        value: newOpp.value,
+        probability: newOpp.probability,
+        expectedCloseDate: newOpp.expectedCloseDate || undefined,
+        description: newOpp.notes
+      });
+      
       setNewOpp({
         clientId: '',
-        name: '',
+        title: '',
         stage: 'Discovery',
-        amount: 0,
-        probability: 0.5,
+        value: 0,
+        probability: 50,
         nextStep: '',
-        nextStepDue: '',
+        expectedCloseDate: '',
         notes: ''
       });
       setShowAddModal(false);
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, oppId: string) => {
-    e.dataTransfer.setData('oppId', oppId);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, newStage: string) => {
-    e.preventDefault();
-    const oppId = e.dataTransfer.getData('oppId');
-    updateOpportunity(oppId, { stage: newStage as any });
-  };
-
-  const renderOpportunityCard = (opp: any, draggable = true) => {
+  const renderOpportunityCard = (opp: any) => {
     const client = clients.find(c => c.id === opp.clientId);
-    const isOverdue = opp.nextStepDue && dayjs(opp.nextStepDue).isBefore(dayjs());
+    const isOverdue = opp.expectedCloseDate && dayjs(opp.expectedCloseDate).isBefore(dayjs());
     
     return (
       <div
         key={opp.id}
-        draggable={draggable && !opp.stage.includes('Closed')}
-        onDragStart={draggable ? (e) => handleDragStart(e, opp.id) : undefined}
-        className="card p-3 cursor-pointer hover:shadow-lg transition-all"
+        className="card p-4 cursor-pointer hover:shadow-lg transition-all mb-3"
         onClick={() => openDrawer(opp, 'opportunity')}
       >
         <div className="flex items-start justify-between mb-2">
-          <div className="flex-1">
-            <h4 className="font-medium text-sm">{opp.name}</h4>
-            <span className="text-xs text-muted sensitive">{client?.name}</span>
-          </div>
+          <h4 className="font-medium text-sm line-clamp-2">{opp.title}</h4>
           {isOverdue && (
-            <AlertCircle size={14} className="text-[var(--danger)]" />
+            <AlertCircle size={16} className="text-[var(--danger)] flex-shrink-0" />
           )}
         </div>
-
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-lg font-semibold">
-            {formatCurrency(opp.amount || 0)}
-          </span>
-          <span className="text-xs bg-[var(--ring)] px-2 py-0.5 rounded-full">
-            {Math.round(opp.probability * 100)}%
-          </span>
-        </div>
-
-        {opp.nextStep && (
-          <div className="p-2 bg-elevated rounded text-xs">
-            <div className="font-medium mb-1">Next: {opp.nextStep}</div>
-            {opp.nextStepDue && (
-              <div className={isOverdue ? 'text-[var(--danger)]' : 'text-muted'}>
-                {dayjs(opp.nextStepDue).format('MMM D')}
-              </div>
-            )}
+        
+        {client && (
+          <div className="text-xs text-muted mb-2">
+            {client.name}
           </div>
         )}
-
-        <div className="mt-3 pt-3 border-t border-[var(--border)]">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted">Weighted</span>
-            <span className="font-medium">
-              {formatCurrency((opp.amount || 0) * opp.probability)}
-            </span>
+        
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-semibold text-[var(--success)]">
+            {formatCurrency(opp.value || 0)}
+          </div>
+          <div className="text-xs text-muted">
+            {opp.probability}% probability
           </div>
         </div>
+        
+        <div className="text-xs text-muted">
+          Expected: {formatCurrency((opp.value || 0) * (opp.probability / 100))}
+        </div>
+        
+        {opp.expectedCloseDate && (
+          <div className={`text-xs mt-2 ${isOverdue ? 'text-[var(--danger)]' : 'text-muted'}`}>
+            Due: {dayjs(opp.expectedCloseDate).format('MMM D')}
+          </div>
+        )}
       </div>
     );
   };
 
-  const renderPipelineColumn = (stage: any) => {
-    const stageOpps = oppsByStage[stage.id];
-    const stageTotal = stageOpps.reduce((sum, o) => sum + (o.amount || 0), 0);
+  const renderStageColumn = (stage: any) => {
+    const stageOpps = oppsByStage[stage.id] || [];
+    const stageTotal = stageOpps.reduce((sum, o) => sum + (o.value || 0), 0);
     const Icon = stage.icon;
     
     return (
-      <div
-        key={stage.id}
-        className="flex-1 min-w-[280px]"
-        onDragOver={handleDragOver}
-        onDrop={(e) => handleDrop(e, stage.id)}
-      >
-        <div className={`flex items-center justify-between mb-3 px-2 pb-2 border-b-2 ${stage.color}`}>
-          <div className="flex items-center gap-2">
-            <Icon size={16} />
-            <h3 className="font-medium">{stage.id}</h3>
+      <div key={stage.id} className="flex-1 min-w-[280px]">
+        <div className="bg-elevated rounded-lg p-4 h-full">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${stage.color}`} />
+              <h3 className="font-semibold">{stage.id}</h3>
+              <Icon size={16} className="text-muted" />
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-medium">{stageOpps.length}</div>
+              <div className="text-xs text-muted">{formatCurrency(stageTotal)}</div>
+            </div>
           </div>
-          <div className="text-right">
-            <div className="text-sm font-medium">{formatCurrency(stageTotal)}</div>
-            <div className="text-xs text-muted">{stageOpps.length} deals</div>
+          
+          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            {stageOpps.map(renderOpportunityCard)}
           </div>
         </div>
-
-        <div className="space-y-2 min-h-[200px]">
-          {stageOpps.map(opp => renderOpportunityCard(opp))}
-        </div>
-
-        {stageOpps.length === 0 && (
-          <div className="text-center py-8 text-muted text-sm opacity-50">
-            Drop opportunities here
-          </div>
-        )}
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-default">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold flex items-center gap-2">
-            <TrendingUp size={24} />
-            Sales Pipeline
+      <div className="flex items-center justify-between p-6 border-b border-default">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold flex items-center gap-3">
+            <TrendingUp className="text-[var(--accent)]" size={28} />
+            Opportunity Pipeline
           </h1>
-
-          <div className="flex items-center gap-3">
-            {/* View toggle */}
-            <div className="flex items-center bg-elevated rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('pipeline')}
-                className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                  viewMode === 'pipeline' ? 'bg-[var(--accent)] text-white' : ''
-                }`}
-              >
-                Pipeline
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                  viewMode === 'list' ? 'bg-[var(--accent)] text-white' : ''
-                }`}
-              >
-                List
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn flex items-center gap-2"
-            >
-              <Plus size={16} />
-              New Opportunity
-            </button>
-          </div>
         </div>
 
-        {/* Metrics */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-elevated p-3 rounded-lg">
-            <div className="text-xs text-muted mb-1">Total Pipeline</div>
-            <div className="text-xl font-semibold">{formatCurrency(totalPipeline)}</div>
+        <div className="flex items-center gap-3">
+          {/* View mode toggle */}
+          <div className="flex bg-elevated rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('pipeline')}
+              className={`px-3 py-1 rounded text-sm ${
+                viewMode === 'pipeline' ? 'bg-[var(--accent)] text-white' : 'text-muted'
+              }`}
+            >
+              Pipeline
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1 rounded text-sm ${
+                viewMode === 'list' ? 'bg-[var(--accent)] text-white' : 'text-muted'
+              }`}
+            >
+              List
+            </button>
           </div>
-          <div className="bg-elevated p-3 rounded-lg">
-            <div className="text-xs text-muted mb-1">Weighted Pipeline</div>
-            <div className="text-xl font-semibold">{formatCurrency(weightedPipeline)}</div>
+
+          {/* Add opportunity */}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn"
+          >
+            <Plus size={16} />
+            Add Opportunity
+          </button>
+        </div>
+      </div>
+
+      {/* Metrics */}
+      <div className="p-6 border-b border-default">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="card p-4 text-center">
+            <div className="text-2xl font-bold text-[var(--accent)] mb-1">
+              {formatCurrency(totalPipeline)}
+            </div>
+            <div className="text-sm text-muted">Total Pipeline</div>
           </div>
-          <div className="bg-elevated p-3 rounded-lg">
-            <div className="text-xs text-muted mb-1">Closed Won</div>
-            <div className="text-xl font-semibold text-[var(--success)]">
+          
+          <div className="card p-4 text-center">
+            <div className="text-2xl font-bold text-[var(--warn)] mb-1">
+              {formatCurrency(weightedPipeline)}
+            </div>
+            <div className="text-sm text-muted">Weighted Pipeline</div>
+          </div>
+          
+          <div className="card p-4 text-center">
+            <div className="text-2xl font-bold text-[var(--success)] mb-1">
               {formatCurrency(closedWon)}
             </div>
+            <div className="text-sm text-muted">Closed Won</div>
           </div>
-          <div className="bg-elevated p-3 rounded-lg">
-            <div className="text-xs text-muted mb-1">Win Rate</div>
-            <div className="text-xl font-semibold">{winRate.toFixed(0)}%</div>
+          
+          <div className="card p-4 text-center">
+            <div className="text-2xl font-bold text-[var(--accent)] mb-1">
+              {Math.round(winRate)}%
+            </div>
+            <div className="text-sm text-muted">Win Rate</div>
           </div>
         </div>
       </div>
 
-      {/* Content */}
+      {/* Pipeline */}
       <div className="flex-1 overflow-auto p-6">
         {viewMode === 'pipeline' ? (
-          <div className="flex gap-4 h-full overflow-x-auto">
-            {stages.map(stage => renderPipelineColumn(stage))}
+          <div className="flex gap-6 h-full overflow-x-auto">
+            {stages.map(renderStageColumn)}
           </div>
         ) : (
-          <div className="space-y-2">
-            {opportunities.map(opp => {
-              const client = clients.find(c => c.id === opp.clientId);
-              const stage = stages.find(s => s.id === opp.stage);
-              
-              return (
-                <div
-                  key={opp.id}
-                  className="row cursor-pointer"
-                  onClick={() => openDrawer(opp, 'opportunity')}
-                >
-                  <div className={`w-1 h-8 rounded ${stage?.color}`} />
-                  <div className="flex-1">
-                    <div className="font-medium">{opp.name}</div>
-                    <div className="text-sm text-muted sensitive">{client?.name}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-medium">{formatCurrency(opp.amount || 0)}</div>
-                    <div className="text-xs text-muted">
-                      {Math.round(opp.probability * 100)}% = {formatCurrency((opp.amount || 0) * opp.probability)}
-                    </div>
-                  </div>
-                  <span className="tag text-xs">{opp.stage}</span>
-                  {opp.nextStepDue && (
-                    <span className={`text-xs ${
-                      dayjs(opp.nextStepDue).isBefore(dayjs()) 
-                        ? 'text-[var(--danger)]' 
-                        : 'text-muted'
-                    }`}>
-                      {dayjs(opp.nextStepDue).format('MMM D')}
-                    </span>
-                  )}
-                  <ChevronRight size={16} className="text-muted" />
-                </div>
-              );
-            })}
+          <div className="space-y-4">
+            {opportunities.map(renderOpportunityCard)}
           </div>
         )}
       </div>
 
       {/* Add opportunity modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="card w-[600px] p-6 animate-slideDown max-h-[80vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-4">New Opportunity</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card w-[500px] p-6">
+            <h3 className="text-lg font-semibold mb-4">Add New Opportunity</h3>
             
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="label">Client *</label>
-                <select
-                  className="input"
-                  value={newOpp.clientId}
-                  onChange={(e) => setNewOpp({ ...newOpp, clientId: e.target.value })}
-                >
-                  <option value="">Select client...</option>
-                  {clients.map(client => (
-                    <option key={client.id} value={client.id}>{client.name}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Opportunity title..."
+                value={newOpp.title}
+                onChange={(e) => setNewOpp({ ...newOpp, title: e.target.value })}
+                className="input w-full"
+                autoFocus
+              />
               
-              <div>
-                <label className="label">Opportunity Name *</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="e.g., Q2 Cloud Migration"
-                  value={newOpp.name}
-                  onChange={(e) => setNewOpp({ ...newOpp, name: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="label">Deal Value ($)</label>
+              <select
+                value={newOpp.clientId}
+                onChange={(e) => setNewOpp({ ...newOpp, clientId: e.target.value })}
+                className="input w-full"
+              >
+                <option value="">Select client (optional)</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>{client.name}</option>
+                ))}
+              </select>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <input
                   type="number"
+                  placeholder="Value ($)..."
+                  value={newOpp.value || ''}
+                  onChange={(e) => setNewOpp({ ...newOpp, value: parseFloat(e.target.value) || 0 })}
                   className="input"
-                  placeholder="125000"
-                  value={newOpp.amount || ''}
-                  onChange={(e) => setNewOpp({ ...newOpp, amount: parseFloat(e.target.value) || 0 })}
+                  min="0"
                 />
-              </div>
-              
-              <div>
-                <label className="label">Probability (%)</label>
+                
                 <input
-                  type="range"
+                  type="number"
+                  placeholder="Probability (%)..."
+                  value={newOpp.probability || ''}
+                  onChange={(e) => setNewOpp({ ...newOpp, probability: parseInt(e.target.value) || 0 })}
+                  className="input"
                   min="0"
                   max="100"
-                  value={newOpp.probability * 100}
-                  onChange={(e) => setNewOpp({ ...newOpp, probability: parseFloat(e.target.value) / 100 })}
-                  className="w-full"
-                />
-                <div className="text-center text-sm mt-1">
-                  {Math.round(newOpp.probability * 100)}%
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="label">Stage</label>
-              <div className="grid grid-cols-3 gap-2">
-                {stages.slice(0, 4).map(stage => (
-                  <button
-                    key={stage.id}
-                    onClick={() => setNewOpp({ ...newOpp, stage: stage.id as any })}
-                    className={`p-2 rounded-lg border transition-colors ${
-                      newOpp.stage === stage.id
-                        ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
-                        : 'border-[var(--border)]'
-                    }`}
-                  >
-                    {stage.id}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="label">Next Step</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Schedule technical review"
-                  value={newOpp.nextStep}
-                  onChange={(e) => setNewOpp({ ...newOpp, nextStep: e.target.value })}
                 />
               </div>
               
-              <div>
-                <label className="label">Next Step Due</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={newOpp.nextStepDue}
-                  onChange={(e) => setNewOpp({ ...newOpp, nextStepDue: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="label">Notes</label>
+              <select
+                value={newOpp.stage}
+                onChange={(e) => setNewOpp({ ...newOpp, stage: e.target.value })}
+                className="input w-full"
+              >
+                {stages.filter(s => !s.id.includes('Closed')).map(stage => (
+                  <option key={stage.id} value={stage.id}>{stage.id}</option>
+                ))}
+              </select>
+              
+              <input
+                type="date"
+                placeholder="Expected close date..."
+                value={newOpp.expectedCloseDate}
+                onChange={(e) => setNewOpp({ ...newOpp, expectedCloseDate: e.target.value })}
+                className="input w-full"
+              />
+              
               <textarea
-                className="input min-h-[80px]"
-                placeholder="Key decision makers, competition, etc..."
+                placeholder="Notes (optional)..."
                 value={newOpp.notes}
                 onChange={(e) => setNewOpp({ ...newOpp, notes: e.target.value })}
+                className="input w-full h-20 resize-none"
               />
             </div>
-
-            <div className="flex justify-end gap-2">
+            
+            <div className="flex gap-2 justify-end mt-6">
               <button
                 onClick={() => setShowAddModal(false)}
                 className="btn btn-ghost"
@@ -425,9 +342,8 @@ export default function OpportunityPipeline() {
               <button
                 onClick={handleCreateOpportunity}
                 className="btn"
-                disabled={!newOpp.name.trim() || !newOpp.clientId}
               >
-                Create Opportunity
+                Add Opportunity
               </button>
             </div>
           </div>

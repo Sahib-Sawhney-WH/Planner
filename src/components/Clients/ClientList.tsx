@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  Users, Plus, Search, Building2, Phone, Mail,
+  Users, Plus, Search, Phone, Mail,
   Globe, Star
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import dayjs from 'dayjs';
 
 export default function ClientList() {
   const {
@@ -43,17 +42,9 @@ export default function ClientList() {
       tasks: clientTasks.length,
       openTasks: clientTasks.filter(t => t.status !== 'Done').length,
       opportunities: clientOpps.length,
-      pipelineValue: clientOpps.reduce((sum, o) => sum + (o.amount || 0) * o.probability, 0),
       stakeholders: clientStakeholders.length,
-      keyStakeholder: clientStakeholders.find(s => s.influence === 5)
+      totalValue: clientOpps.reduce((sum, opp) => sum + (opp.value || 0), 0)
     };
-  };
-
-  const getTagColor = (tag: string) => {
-    if (tag.includes('Signed')) return 'tag-signed';
-    if (tag.includes('Pre-sales')) return 'tag-presales';
-    if (tag.includes('Sales')) return 'tag-impl';
-    return 'tag';
   };
 
   const handleAddClient = () => {
@@ -68,264 +59,195 @@ export default function ClientList() {
     }
   };
 
+  const allTags = Array.from(new Set(clients.flatMap(c => c.tags)));
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-default">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold flex items-center gap-2">
-            <Users size={24} />
+      <div className="flex items-center justify-between p-6 border-b border-default">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold flex items-center gap-3">
+            <Users className="text-[var(--accent)]" size={28} />
             Clients
-            <span className="text-sm text-muted ml-2">({clients.length})</span>
           </h1>
-
-          <div className="flex items-center gap-3">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
-              <input
-                type="text"
-                placeholder="Search clients..."
-                className="input pl-9 w-64"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            {/* Tag filter */}
-            <select
-              className="input"
-              value={filterTag}
-              onChange={(e) => setFilterTag(e.target.value)}
-            >
-              <option value="">All Tags</option>
-              <option value="Signed">Signed</option>
-              <option value="Pre-sales">Pre-sales</option>
-              <option value="Sales pursuit">Sales pursuit</option>
-              <option value="Enterprise">Enterprise</option>
-              <option value="SMB">SMB</option>
-            </select>
-
-            {/* Add client */}
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn flex items-center gap-2"
-            >
-              <Plus size={16} />
-              Add Client
-            </button>
-          </div>
+          <span className="text-muted">
+            {filteredClients.length} of {clients.length}
+          </span>
         </div>
 
-        {/* Summary stats */}
-        <div className="flex items-center gap-6 text-sm">
-          <span className="text-muted">
-            <span className="font-medium text-[var(--text)]">
-              {clients.filter(c => c.tags.includes('Signed')).length}
-            </span> Active
-          </span>
-          <span className="text-muted">
-            <span className="font-medium text-[var(--text)]">
-              {clients.filter(c => c.tags.includes('Pre-sales')).length}
-            </span> Pre-sales
-          </span>
-          <span className="text-muted">
-            <span className="font-medium text-[var(--text)]">
-              {clients.filter(c => c.tags.includes('Sales pursuit')).length}
-            </span> Pursuits
-          </span>
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
+            <input
+              type="text"
+              placeholder="Search clients..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input pl-9 w-64"
+            />
+          </div>
+
+          {/* Tag filter */}
+          <select
+            value={filterTag}
+            onChange={(e) => setFilterTag(e.target.value)}
+            className="input w-40"
+          >
+            <option value="">All Tags</option>
+            {allTags.map(tag => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+
+          {/* Add client */}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn"
+          >
+            <Plus size={16} />
+            Add Client
+          </button>
         </div>
       </div>
 
-      {/* Client grid */}
+      {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredClients.map(client => {
             const metrics = getClientMetrics(client.id);
             
             return (
               <div
                 key={client.id}
-                className="card hover:shadow-lg transition-all cursor-pointer"
+                className="card p-6 cursor-pointer hover:shadow-lg transition-all"
                 onClick={() => openDrawer(client, 'client')}
               >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-lg sensitive">{client.name}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      {client.tags.map(tag => (
-                        <span key={tag} className={`tag text-xs ${getTagColor(tag)}`}>
-                          {tag}
-                        </span>
-                      ))}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-[var(--accent)] rounded-lg flex items-center justify-center text-white font-semibold">
+                      {client.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">{client.name}</h3>
+                      {client.industry && (
+                        <p className="text-sm text-muted">{client.industry}</p>
+                      )}
                     </div>
                   </div>
-                  <Building2 size={20} className="text-muted" />
+                  
+                  {client.isKeyAccount && (
+                    <Star className="text-[var(--warn)]" size={20} fill="currentColor" />
+                  )}
+                </div>
+
+                {/* Contact info */}
+                <div className="space-y-2 mb-4">
+                  {client.website && (
+                    <div className="flex items-center gap-2 text-sm text-muted">
+                      <Globe size={14} />
+                      <span>{client.website}</span>
+                    </div>
+                  )}
+                  {client.phone && (
+                    <div className="flex items-center gap-2 text-sm text-muted">
+                      <Phone size={14} />
+                      <span>{client.phone}</span>
+                    </div>
+                  )}
+                  {client.email && (
+                    <div className="flex items-center gap-2 text-sm text-muted">
+                      <Mail size={14} />
+                      <span>{client.email}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Metrics */}
-                <div className="grid grid-cols-3 gap-3 mb-3 pb-3 border-b border-default">
-                  <div>
-                    <div className="text-xs text-muted">Projects</div>
-                    <div className="font-semibold">
-                      {metrics.activeProjects}/{metrics.projects}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-[var(--accent)]">
+                      {metrics.activeProjects}
                     </div>
+                    <div className="text-xs text-muted">Active Projects</div>
                   </div>
-                  <div>
-                    <div className="text-xs text-muted">Tasks</div>
-                    <div className="font-semibold">
-                      {metrics.openTasks}/{metrics.tasks}
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-[var(--accent)]">
+                      {metrics.openTasks}
                     </div>
+                    <div className="text-xs text-muted">Open Tasks</div>
                   </div>
-                  <div>
-                    <div className="text-xs text-muted">Pipeline</div>
-                    <div className="font-semibold">
-                      ${(metrics.pipelineValue / 1000).toFixed(0)}K
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-[var(--success)]">
+                      ${metrics.totalValue.toLocaleString()}
                     </div>
+                    <div className="text-xs text-muted">Pipeline Value</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-semibold">
+                      {metrics.stakeholders}
+                    </div>
+                    <div className="text-xs text-muted">Contacts</div>
                   </div>
                 </div>
 
-                {/* Next step */}
-                {client.nextStep && (
-                  <div className="mb-3">
-                    <div className="text-xs text-muted mb-1">Next Step</div>
-                    <div className="text-sm">{client.nextStep}</div>
-                    {client.nextStepDue && (
-                      <div className="text-xs text-muted mt-1">
-                        Due {dayjs(client.nextStepDue).format('MMM D')}
-                      </div>
-                    )}
+                {/* Tags */}
+                {client.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {client.tags.map(tag => (
+                      <span key={tag} className="tag text-xs">{tag}</span>
+                    ))}
                   </div>
                 )}
-
-                {/* Key stakeholder */}
-                {metrics.keyStakeholder && (
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <Star size={14} className="text-[var(--warn)]" />
-                      <span className="sensitive">{metrics.keyStakeholder.name}</span>
-                    </div>
-                    <span className="text-xs text-muted">
-                      {metrics.keyStakeholder.role}
-                    </span>
-                  </div>
-                )}
-
-                {/* Quick actions */}
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-default">
-                  {client.contacts[0]?.email && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.location.href = `mailto:${client.contacts[0].email}`;
-                      }}
-                      className="p-1.5 hover:bg-elevated rounded transition-colors"
-                      title="Email"
-                    >
-                      <Mail size={14} />
-                    </button>
-                  )}
-                  {client.contacts[0]?.phone && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.location.href = `tel:${client.contacts[0].phone}`;
-                      }}
-                      className="p-1.5 hover:bg-elevated rounded transition-colors"
-                      title="Call"
-                    >
-                      <Phone size={14} />
-                    </button>
-                  )}
-                  {client.links[0] && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(client.links[0], '_blank');
-                      }}
-                      className="p-1.5 hover:bg-elevated rounded transition-colors"
-                      title="Website"
-                    >
-                      <Globe size={14} />
-                    </button>
-                  )}
-                  <div className="flex-1" />
-                  <span className="text-xs text-muted">
-                    {metrics.stakeholders} contacts
-                  </span>
-                </div>
               </div>
             );
           })}
         </div>
-
-        {filteredClients.length === 0 && (
-          <div className="text-center py-12">
-            <Users size={48} className="text-muted mx-auto mb-4 opacity-20" />
-            <p className="text-muted">
-              {searchQuery || filterTag ? 'No clients match your filters' : 'No clients yet'}
-            </p>
-            {!searchQuery && !filterTag && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="btn mt-4"
-              >
-                Add Your First Client
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Add client modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="card w-[500px] p-6 animate-slideDown">
-            <h2 className="text-lg font-semibold mb-4">Add New Client</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card w-96 p-6">
+            <h3 className="text-lg font-semibold mb-4">Add New Client</h3>
             
-            <div className="mb-4">
-              <label className="label">Client Name</label>
+            <div className="space-y-4">
               <input
                 type="text"
-                className="input"
-                placeholder="Enter client name..."
+                placeholder="Client name..."
                 value={newClientName}
                 onChange={(e) => setNewClientName(e.target.value)}
+                className="input w-full"
                 autoFocus
               />
-            </div>
-
-            <div className="mb-4">
-              <label className="label">Tags</label>
-              <div className="flex flex-wrap gap-2">
-                {['Sales pursuit', 'Pre-sales', 'Signed', 'Enterprise', 'SMB'].map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => {
-                      if (selectedTags.includes(tag)) {
-                        setSelectedTags(selectedTags.filter(t => t !== tag));
-                      } else {
-                        setSelectedTags([...selectedTags, tag]);
-                      }
-                    }}
-                    className={`tag ${
-                      selectedTags.includes(tag) ? getTagColor(tag) : ''
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                ))}
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Tags</label>
+                <div className="flex flex-wrap gap-2">
+                  {allTags.map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => {
+                        if (selectedTags.includes(tag)) {
+                          setSelectedTags(selectedTags.filter(t => t !== tag));
+                        } else {
+                          setSelectedTags([...selectedTags, tag]);
+                        }
+                      }}
+                      className={`tag text-xs cursor-pointer ${
+                        selectedTags.includes(tag) ? 'bg-[var(--accent)] text-white' : ''
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-
-            <div className="flex justify-end gap-2">
+            
+            <div className="flex gap-2 justify-end mt-6">
               <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setNewClientName('');
-                  setSelectedTags([]);
-                }}
+                onClick={() => setShowAddModal(false)}
                 className="btn btn-ghost"
               >
                 Cancel
@@ -333,7 +255,6 @@ export default function ClientList() {
               <button
                 onClick={handleAddClient}
                 className="btn"
-                disabled={!newClientName.trim()}
               >
                 Add Client
               </button>
@@ -344,3 +265,4 @@ export default function ClientList() {
     </div>
   );
 }
+

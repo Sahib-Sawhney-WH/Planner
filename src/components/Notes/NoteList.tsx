@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  FileText, Plus, Search, Tag, Calendar, Link2,
-  Edit3, Trash2, Download, Upload, Hash
+  FileText, Plus, Search, Calendar, Link2,
+  Edit3, Trash2, Hash
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import dayjs from 'dayjs';
-import ReactMarkdown from 'react-markdown';
+import dayjs from '../../lib/dayjs-config';
 
 export default function NoteList() {
   const {
@@ -13,398 +12,224 @@ export default function NoteList() {
     clients,
     projects,
     createNote,
-    updateNote,
     deleteNote,
     openDrawer
   } = useStore();
 
-  const [selectedNote, setSelectedNote] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterTag, setFilterTag] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState('');
-  const [showNewNote, setShowNewNote] = useState(false);
-  const [newNote, setNewNote] = useState({
-    title: '',
-    body: '',
-    tags: [] as string[],
-    clientId: '',
-    projectId: ''
-  });
+  const [filterTag, setFilterTag] = useState<string>('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newNoteTitle, setNewNoteTitle] = useState('');
+  const [newNoteContent, setNewNoteContent] = useState('');
 
   // Filter notes
   const filteredNotes = notes.filter(note => {
     const matchesSearch = note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          note.body?.toLowerCase().includes(searchQuery.toLowerCase());
+                         note.content.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTag = !filterTag || note.tags.includes(filterTag);
     return matchesSearch && matchesTag;
   });
 
-  // Get all unique tags
+  const handleAddNote = async () => {
+    if (newNoteTitle.trim()) {
+      await createNote({
+        title: newNoteTitle,
+        content: newNoteContent,
+        tags: []
+      });
+      setNewNoteTitle('');
+      setNewNoteContent('');
+      setShowAddModal(false);
+    }
+  };
+
   const allTags = Array.from(new Set(notes.flatMap(n => n.tags)));
 
-  const handleCreateNote = async () => {
-    if (newNote.title.trim()) {
-      // In real app, would save markdown to file
-      const noteId = await createNote({
-        ...newNote,
-        bodyMarkdownPath: `notes/${Date.now()}.md`
-      });
-      
-      setNewNote({
-        title: '',
-        body: '',
-        tags: [],
-        clientId: '',
-        projectId: ''
-      });
-      setShowNewNote(false);
-    }
-  };
-
-  const handleSaveEdit = () => {
-    if (selectedNote) {
-      updateNote(selectedNote.id, {
-        body: editContent
-      });
-      setSelectedNote({ ...selectedNote, body: editContent });
-      setIsEditing(false);
-    }
-  };
-
-  const handleDeleteNote = (noteId: string) => {
-    if (confirm('Delete this note?')) {
-      deleteNote(noteId);
-      if (selectedNote?.id === noteId) {
-        setSelectedNote(null);
-      }
-    }
-  };
-
-  const renderNoteList = () => (
-    <div className="w-80 border-r border-default h-full overflow-auto">
-      {/* Search and filters */}
-      <div className="p-4 border-b border-default">
-        <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
-          <input
-            type="text"
-            placeholder="Search notes..."
-            className="input pl-9 text-sm"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between p-6 border-b border-default">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold flex items-center gap-3">
+            <FileText className="text-[var(--accent)]" size={28} />
+            Notes
+          </h1>
+          <span className="text-muted">
+            {filteredNotes.length} of {notes.length}
+          </span>
         </div>
-        
-        <select
-          className="input text-sm w-full"
-          value={filterTag}
-          onChange={(e) => setFilterTag(e.target.value)}
-        >
-          <option value="">All Tags</option>
-          {allTags.map(tag => (
-            <option key={tag} value={tag}>{tag}</option>
-          ))}
-        </select>
+
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
+            <input
+              type="text"
+              placeholder="Search notes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input pl-9 w-64"
+            />
+          </div>
+
+          {/* Tag filter */}
+          <select
+            value={filterTag}
+            onChange={(e) => setFilterTag(e.target.value)}
+            className="input w-40"
+          >
+            <option value="">All Tags</option>
+            {allTags.map(tag => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+
+          {/* Add note */}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn"
+          >
+            <Plus size={16} />
+            Add Note
+          </button>
+        </div>
       </div>
 
-      {/* Notes list */}
-      <div className="p-2">
-        {filteredNotes.map(note => {
-          const client = clients.find(c => c.id === note.clientId);
-          const project = projects.find(p => p.id === note.projectId);
-          
-          return (
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredNotes.map(note => (
             <div
               key={note.id}
-              onClick={() => {
-                setSelectedNote(note);
-                setEditContent(note.body || '');
-                setIsEditing(false);
-              }}
-              className={`p-3 rounded-lg mb-2 cursor-pointer transition-all ${
-                selectedNote?.id === note.id
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'hover:bg-elevated'
-              }`}
+              className="card p-6 cursor-pointer hover:shadow-lg transition-all"
+              onClick={() => openDrawer(note, 'note')}
             >
-              <h4 className="font-medium text-sm mb-1">{note.title}</h4>
-              
-              <div className="text-xs opacity-75 mb-2">
-                {dayjs(note.updatedAt).format('MMM D, YYYY')}
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="font-semibold text-lg line-clamp-2">{note.title}</h3>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Edit note
+                    }}
+                    className="p-1 hover:bg-elevated rounded"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm('Delete this note?')) {
+                        deleteNote(note.id);
+                      }
+                    }}
+                    className="p-1 hover:bg-elevated rounded text-[var(--danger)]"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-              
-              {(client || project) && (
-                <div className="text-xs opacity-75 mb-2">
-                  {client && <span className="sensitive">{client.name}</span>}
-                  {client && project && ' • '}
-                  {project && <span>{project.title}</span>}
+
+              {/* Content preview */}
+              <p className="text-sm text-muted mb-4 line-clamp-3">
+                {note.content || 'No content'}
+              </p>
+
+              {/* Metadata */}
+              <div className="space-y-2 mb-4">
+                {note.clientId && (
+                  <div className="flex items-center gap-2 text-xs text-muted">
+                    <span>Client:</span>
+                    <span className="sensitive">
+                      {clients.find(c => c.id === note.clientId)?.name}
+                    </span>
+                  </div>
+                )}
+                {note.projectId && (
+                  <div className="flex items-center gap-2 text-xs text-muted">
+                    <span>Project:</span>
+                    <span>
+                      {projects.find(p => p.id === note.projectId)?.title}
+                    </span>
+                  </div>
+                )}
+                {note.linkedTasks && note.linkedTasks.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-muted">
+                    <Link2 size={12} />
+                    <span>{note.linkedTasks.length} linked tasks</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Tags */}
+              {note.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {note.tags.map(tag => (
+                    <span key={tag} className="tag text-xs">
+                      <Hash size={10} />
+                      {tag}
+                    </span>
+                  ))}
                 </div>
               )}
-              
-              <div className="flex flex-wrap gap-1">
-                {note.tags.slice(0, 3).map(tag => (
-                  <span
-                    key={tag}
-                    className={`text-xs px-1.5 py-0.5 rounded ${
-                      selectedNote?.id === note.id
-                        ? 'bg-white/20'
-                        : 'bg-[var(--ring)]'
-                    }`}
-                  >
-                    {tag}
-                  </span>
-                ))}
-                {note.tags.length > 3 && (
-                  <span className="text-xs opacity-75">+{note.tags.length - 3}</span>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between text-xs text-muted">
+                <div className="flex items-center gap-2">
+                  <Calendar size={12} />
+                  <span>{dayjs(note.createdAt).format('MMM D, YYYY')}</span>
+                </div>
+                {note.updatedAt && note.updatedAt !== note.createdAt && (
+                  <span>Updated {dayjs(note.updatedAt).fromNow()}</span>
                 )}
               </div>
             </div>
-          );
-        })}
-        
+          ))}
+        </div>
+
         {filteredNotes.length === 0 && (
-          <div className="text-center py-8 text-muted text-sm">
-            {searchQuery || filterTag ? 'No notes match filters' : 'No notes yet'}
+          <div className="text-center text-muted py-12">
+            {searchQuery || filterTag ? 'No notes match your filters' : 'No notes yet'}
           </div>
         )}
       </div>
-    </div>
-  );
 
-  const renderNoteEditor = () => {
-    if (!selectedNote) {
-      return (
-        <div className="flex-1 flex items-center justify-center text-muted">
-          <div className="text-center">
-            <FileText size={48} className="mx-auto mb-4 opacity-20" />
-            <p>Select a note to view</p>
-          </div>
-        </div>
-      );
-    }
-
-    const client = clients.find(c => c.id === selectedNote.clientId);
-    const project = projects.find(p => p.id === selectedNote.projectId);
-
-    return (
-      <div className="flex-1 flex flex-col">
-        {/* Note header */}
-        <div className="px-6 py-4 border-b border-default">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-xl font-semibold mb-2">{selectedNote.title}</h2>
-              <div className="flex items-center gap-4 text-sm text-muted">
-                {client && (
-                  <span className="flex items-center gap-1">
-                    <Link2 size={14} />
-                    <span className="sensitive">{client.name}</span>
-                  </span>
-                )}
-                {project && (
-                  <span className="flex items-center gap-1">
-                    <Link2 size={14} />
-                    {project.title}
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <Calendar size={14} />
-                  {dayjs(selectedNote.updatedAt).format('MMM D, YYYY h:mm A')}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                {selectedNote.tags.map((tag: string) => (
-                  <span key={tag} className="tag text-xs">
-                    <Hash size={10} className="inline mr-1" />
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
+      {/* Add note modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card w-[600px] p-6">
+            <h3 className="text-lg font-semibold mb-4">Add New Note</h3>
             
-            <div className="flex items-center gap-2">
-              {isEditing ? (
-                <>
-                  <button
-                    onClick={handleSaveEdit}
-                    className="btn btn-ghost text-sm"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditContent(selectedNote.body || '');
-                    }}
-                    className="btn btn-ghost text-sm"
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="p-2 hover:bg-elevated rounded-lg transition-colors"
-                  >
-                    <Edit3 size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteNote(selectedNote.id)}
-                    className="p-2 hover:bg-elevated rounded-lg transition-colors text-[var(--danger)]"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Note content */}
-        <div className="flex-1 overflow-auto p-6">
-          {isEditing ? (
-            <textarea
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              className="w-full h-full p-4 bg-elevated rounded-lg font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              placeholder="Write your note in Markdown..."
-            />
-          ) : (
-            <div className="prose prose-invert max-w-none">
-              <ReactMarkdown>
-                {selectedNote.body || '*No content*'}
-              </ReactMarkdown>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-default">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold flex items-center gap-2">
-            <FileText size={24} />
-            Notes
-            <span className="text-sm text-muted ml-2">({notes.length})</span>
-          </h1>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowNewNote(true)}
-              className="btn flex items-center gap-2"
-            >
-              <Plus size={16} />
-              New Note
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {renderNoteList()}
-        {renderNoteEditor()}
-      </div>
-
-      {/* New note modal */}
-      {showNewNote && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="card w-[600px] p-6 animate-slideDown max-h-[80vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-4">Create New Note</h2>
-            
-            <div className="mb-4">
-              <label className="label">Title</label>
+            <div className="space-y-4">
               <input
                 type="text"
-                className="input"
                 placeholder="Note title..."
-                value={newNote.title}
-                onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
+                value={newNoteTitle}
+                onChange={(e) => setNewNoteTitle(e.target.value)}
+                className="input w-full"
                 autoFocus
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="label">Link to Client</label>
-                <select
-                  className="input"
-                  value={newNote.clientId}
-                  onChange={(e) => setNewNote({ ...newNote, clientId: e.target.value })}
-                >
-                  <option value="">None</option>
-                  {clients.map(client => (
-                    <option key={client.id} value={client.id}>{client.name}</option>
-                  ))}
-                </select>
-              </div>
               
-              <div>
-                <label className="label">Link to Project</label>
-                <select
-                  className="input"
-                  value={newNote.projectId}
-                  onChange={(e) => setNewNote({ ...newNote, projectId: e.target.value })}
-                >
-                  <option value="">None</option>
-                  {projects.map(project => (
-                    <option key={project.id} value={project.id}>{project.title}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="label">Tags</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="meeting, decisions, requirements (comma-separated)"
-                value={newNote.tags.join(', ')}
-                onChange={(e) => setNewNote({ 
-                  ...newNote, 
-                  tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
-                })}
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="label">Content (Markdown)</label>
               <textarea
-                className="input min-h-[200px] font-mono text-sm"
-                placeholder="# Meeting Notes&#10;&#10;## Attendees&#10;- John Smith&#10;&#10;## Discussion Points&#10;..."
-                value={newNote.body}
-                onChange={(e) => setNewNote({ ...newNote, body: e.target.value })}
+                placeholder="Note content..."
+                value={newNoteContent}
+                onChange={(e) => setNewNoteContent(e.target.value)}
+                className="input w-full h-32 resize-none"
               />
             </div>
-
-            <div className="flex justify-end gap-2">
+            
+            <div className="flex gap-2 justify-end mt-6">
               <button
-                onClick={() => {
-                  setShowNewNote(false);
-                  setNewNote({
-                    title: '',
-                    body: '',
-                    tags: [],
-                    clientId: '',
-                    projectId: ''
-                  });
-                }}
+                onClick={() => setShowAddModal(false)}
                 className="btn btn-ghost"
               >
                 Cancel
               </button>
               <button
-                onClick={handleCreateNote}
+                onClick={handleAddNote}
                 className="btn"
-                disabled={!newNote.title.trim()}
               >
-                Create Note
+                Add Note
               </button>
             </div>
           </div>
@@ -413,3 +238,4 @@ export default function NoteList() {
     </div>
   );
 }
+

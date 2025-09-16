@@ -4,15 +4,15 @@ import {
   FileText, Video, Github, HelpCircle, Link
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import dayjs from 'dayjs';
+import dayjs from '../../lib/dayjs-config';
 
 type SourceType = 'howto' | 'article' | 'docs' | 'github' | 'video' | 'other';
 
 export default function KnowledgeRepository() {
   const {
-    knowledgeItems,
-    createKnowledgeItem,
-    updateKnowledgeItem
+    knowledge,
+    createKnowledge,
+    updateKnowledge
   } = useStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,28 +28,18 @@ export default function KnowledgeRepository() {
   });
 
   // Get all unique tags
-  const allTags = Array.from(new Set(knowledgeItems.flatMap(k => k.tags)));
+  const allTags = Array.from(new Set(knowledge.flatMap((k: any) => k.tags)));
 
   // Filter items
-  const filteredItems = knowledgeItems.filter(item => {
+  const filteredItems = knowledge.filter((item: any) => {
     const matchesSearch = 
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+      item.tags.some((t: any) => t.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesType = !filterType || item.sourceType === filterType;
     const matchesTag = !filterTag || item.tags.includes(filterTag);
     return matchesSearch && matchesType && matchesTag;
   });
-
-  // Group by source type
-  const itemsByType = {
-    howto: filteredItems.filter(i => i.sourceType === 'howto'),
-    article: filteredItems.filter(i => i.sourceType === 'article'),
-    docs: filteredItems.filter(i => i.sourceType === 'docs'),
-    github: filteredItems.filter(i => i.sourceType === 'github'),
-    video: filteredItems.filter(i => i.sourceType === 'video'),
-    other: filteredItems.filter(i => i.sourceType === 'other')
-  };
 
   const sourceTypeIcons: Record<SourceType, React.ComponentType<any>> = {
     howto: HelpCircle,
@@ -71,7 +61,13 @@ export default function KnowledgeRepository() {
 
   const handleCreateItem = () => {
     if (newItem.title.trim() && newItem.url.trim()) {
-      createKnowledgeItem(newItem);
+      createKnowledge({
+        title: newItem.title,
+        content: newItem.url,
+        category: newItem.sourceType,
+        tags: newItem.tags,
+        isPublic: false
+      });
       setNewItem({
         title: '',
         url: '',
@@ -85,33 +81,30 @@ export default function KnowledgeRepository() {
 
   const handleOpenUrl = (url: string, itemId: string) => {
     window.open(url, '_blank');
-    // Update last accessed time
-    updateKnowledgeItem(itemId, {
-      lastAccessedAt: new Date().toISOString()
-    });
+    // Note: lastAccessedAt tracking would need to be added to Knowledge type
   };
 
   const renderKnowledgeCard = (item: any) => {
-    const Icon = sourceTypeIcons[item.sourceType as SourceType];
-    const colorClass = sourceTypeColors[item.sourceType as SourceType];
+    const Icon = sourceTypeIcons[item.category as SourceType] || Link;
+    const colorClass = sourceTypeColors[item.category as SourceType] || 'text-[var(--subtle)]';
     
     return (
       <div
         key={item.id}
-        className="card hover:shadow-lg transition-all group"
+        className="card hover:shadow-lg transition-all group p-4"
       >
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-start gap-3">
             <Icon size={20} className={`${colorClass} mt-1`} />
             <div className="flex-1">
               <h4 className="font-medium mb-1">{item.title}</h4>
-              {item.description && (
-                <p className="text-sm text-muted mb-2">{item.description}</p>
+              {item.content && (
+                <p className="text-sm text-muted mb-2">{item.content}</p>
               )}
               <div className="flex items-center gap-2 text-xs text-muted">
-                <span>{new URL(item.url).hostname}</span>
+                <span>{item.category || 'other'}</span>
                 <span>•</span>
-                <span>Accessed {dayjs(item.lastAccessedAt).fromNow()}</span>
+                <span>Accessed {dayjs(item.lastAccessedAt || item.createdAt).fromNow()}</span>
               </div>
             </div>
           </div>
@@ -127,14 +120,14 @@ export default function KnowledgeRepository() {
 
         <div className="flex items-center justify-between">
           <button
-            onClick={() => handleOpenUrl(item.url, item.id)}
+            onClick={() => handleOpenUrl(item.content, item.id)}
             className="btn btn-ghost text-sm flex items-center gap-2"
           >
             <ExternalLink size={14} />
             Open
           </button>
           <span className="text-xs text-muted capitalize">
-            {item.sourceType}
+            {item.category || 'other'}
           </span>
         </div>
       </div>
@@ -149,7 +142,7 @@ export default function KnowledgeRepository() {
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <BookOpen size={24} />
             Knowledge Repository
-            <span className="text-sm text-muted ml-2">({knowledgeItems.length})</span>
+            <span className="text-sm text-muted ml-2">({knowledge.length})</span>
           </h1>
 
           <div className="flex items-center gap-3">
@@ -159,22 +152,22 @@ export default function KnowledgeRepository() {
               <input
                 type="text"
                 placeholder="Search knowledge..."
-                className="input pl-9 w-64"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="input pl-9 w-64"
               />
             </div>
 
             {/* Type filter */}
             <select
-              className="input"
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
+              className="input w-32"
             >
               <option value="">All Types</option>
               <option value="howto">How-to</option>
               <option value="article">Article</option>
-              <option value="docs">Documentation</option>
+              <option value="docs">Docs</option>
               <option value="github">GitHub</option>
               <option value="video">Video</option>
               <option value="other">Other</option>
@@ -182,149 +175,89 @@ export default function KnowledgeRepository() {
 
             {/* Tag filter */}
             <select
-              className="input"
               value={filterTag}
               onChange={(e) => setFilterTag(e.target.value)}
+              className="input w-32"
             >
               <option value="">All Tags</option>
-              {allTags.map(tag => (
-                <option key={tag} value={tag}>#{tag}</option>
+              {allTags.map((tag: any) => (
+                <option key={String(tag)} value={String(tag)}>#{String(tag)}</option>
               ))}
             </select>
 
+            {/* Add button */}
             <button
               onClick={() => setShowAddModal(true)}
-              className="btn flex items-center gap-2"
+              className="btn"
             >
               <Plus size={16} />
-              Add Resource
+              Add Knowledge
             </button>
           </div>
-        </div>
-
-        {/* Summary stats */}
-        <div className="flex items-center gap-6 text-sm">
-          {Object.entries(itemsByType).map(([type, items]) => (
-            <span key={type} className="text-muted">
-              <span className="font-medium text-[var(--text)]">
-                {items.length}
-              </span> {type}
-            </span>
-          ))}
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredItems.map(item => renderKnowledgeCard(item))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredItems.map((item: any) => renderKnowledgeCard(item))}
         </div>
 
         {filteredItems.length === 0 && (
-          <div className="text-center py-12">
-            <BookOpen size={48} className="text-muted mx-auto mb-4 opacity-20" />
-            <p className="text-muted">
-              {searchQuery || filterType || filterTag 
-                ? 'No resources match your filters' 
-                : 'No resources yet'
-              }
-            </p>
-            {!searchQuery && !filterType && !filterTag && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="btn mt-4"
-              >
-                Add Your First Resource
-              </button>
-            )}
+          <div className="text-center text-muted py-12">
+            {searchQuery || filterType || filterTag ? 'No knowledge items match your filters' : 'No knowledge items yet'}
           </div>
         )}
       </div>
 
-      {/* Add resource modal */}
+      {/* Add modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="card w-[600px] p-6 animate-slideDown">
-            <h2 className="text-lg font-semibold mb-4">Add Knowledge Resource</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card w-[500px] p-6">
+            <h3 className="text-lg font-semibold mb-4">Add Knowledge Item</h3>
             
-            <div className="mb-4">
-              <label className="label">Title</label>
+            <div className="space-y-4">
               <input
                 type="text"
-                className="input"
-                placeholder="Resource title..."
+                placeholder="Title..."
                 value={newItem.title}
                 onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
+                className="input w-full"
                 autoFocus
               />
-            </div>
-
-            <div className="mb-4">
-              <label className="label">URL</label>
+              
               <input
                 type="url"
-                className="input"
-                placeholder="https://..."
+                placeholder="URL..."
                 value={newItem.url}
                 onChange={(e) => setNewItem({ ...newItem, url: e.target.value })}
+                className="input w-full"
               />
-            </div>
-
-            <div className="mb-4">
-              <label className="label">Description</label>
+              
+              <select
+                value={newItem.sourceType}
+                onChange={(e) => setNewItem({ ...newItem, sourceType: e.target.value as SourceType })}
+                className="input w-full"
+              >
+                <option value="other">Other</option>
+                <option value="howto">How-to Guide</option>
+                <option value="article">Article</option>
+                <option value="docs">Documentation</option>
+                <option value="github">GitHub</option>
+                <option value="video">Video</option>
+              </select>
+              
               <textarea
-                className="input min-h-[80px]"
-                placeholder="Brief description..."
+                placeholder="Description (optional)..."
                 value={newItem.description}
                 onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                className="input w-full h-20 resize-none"
               />
             </div>
-
-            <div className="mb-4">
-              <label className="label">Source Type</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['howto', 'article', 'docs', 'github', 'video', 'other'] as SourceType[]).map(type => (
-                  <button
-                    key={type}
-                    onClick={() => setNewItem({ ...newItem, sourceType: type })}
-                    className={`p-2 rounded border transition-colors capitalize ${
-                      newItem.sourceType === type
-                        ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
-                        : 'border-[var(--border)]'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="label">Tags (comma-separated)</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="react, typescript, tutorial"
-                value={newItem.tags.join(', ')}
-                onChange={(e) => setNewItem({ 
-                  ...newItem, 
-                  tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
-                })}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
+            
+            <div className="flex gap-2 justify-end mt-6">
               <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setNewItem({
-                    title: '',
-                    url: '',
-                    description: '',
-                    tags: [],
-                    sourceType: 'other'
-                  });
-                }}
+                onClick={() => setShowAddModal(false)}
                 className="btn btn-ghost"
               >
                 Cancel
@@ -332,9 +265,8 @@ export default function KnowledgeRepository() {
               <button
                 onClick={handleCreateItem}
                 className="btn"
-                disabled={!newItem.title.trim() || !newItem.url.trim()}
               >
-                Add Resource
+                Add Knowledge
               </button>
             </div>
           </div>
@@ -343,3 +275,4 @@ export default function KnowledgeRepository() {
     </div>
   );
 }
+

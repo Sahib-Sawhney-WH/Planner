@@ -5,7 +5,6 @@ import {
   Search, Plus, Menu, X, ChevronRight, Timer, Eye, EyeOff
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import { useHotkeys } from 'react-hotkeys-hook';
 import dayjs from 'dayjs';
 
 interface LayoutProps {
@@ -255,10 +254,11 @@ export default function Layout({ children }: LayoutProps) {
             className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] max-h-[500px] overflow-auto card animate-slideDown"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Search results would go here */}
             <div className="p-4">
-              <h3 className="text-sm font-medium text-muted mb-3">Search Results</h3>
-              {/* Results list */}
+              <h3 className="font-semibold mb-3">Search Results</h3>
+              <div className="text-muted">
+                Search functionality would be implemented here
+              </div>
             </div>
           </div>
         </div>
@@ -266,3 +266,4 @@ export default function Layout({ children }: LayoutProps) {
     </div>
   );
 }
+

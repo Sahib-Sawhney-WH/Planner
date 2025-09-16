@@ -2,9 +2,19 @@ import { useEffect } from 'react';
 import Layout from './components/Layout/Layout';
 import { initDB } from './lib/db';
 import { useStore } from './lib/store';
+import ConsultantHome from './components/Dashboard/ConsultantHome';
+import TaskList from './components/Tasks/TaskList';
+import ProjectList from './components/Projects/ProjectList';
+import ClientList from './components/Clients/ClientList';
+import NoteList from './components/Notes/NoteList';
+import OpportunityPipeline from './components/Opportunities/OpportunityPipeline';
+import RAIDLog from './components/RAID/RAIDLog';
+import KnowledgeRepository from './components/Knowledge/KnowledgeRepository';
+import TimeTracker from './components/Time/TimeTracker';
+import Settings from './components/Common/Settings';
 
 function App() {
-  const { loadData, setTheme, setAccentColor, setDensity } = useStore();
+  const { loadData, setTheme, setAccentColor, setDensity, currentView } = useStore();
 
   useEffect(() => {
     const init = async () => {
@@ -24,7 +34,39 @@ function App() {
     init();
   }, [loadData, setTheme, setAccentColor, setDensity]);
 
-  return <Layout />;
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'dashboard':
+        return <ConsultantHome />;
+      case 'tasks':
+        return <TaskList />;
+      case 'projects':
+        return <ProjectList />;
+      case 'clients':
+        return <ClientList />;
+      case 'notes':
+        return <NoteList />;
+      case 'opportunities':
+        return <OpportunityPipeline />;
+      case 'raid':
+        return <RAIDLog />;
+      case 'knowledge':
+        return <KnowledgeRepository />;
+      case 'time':
+        return <TimeTracker />;
+      case 'settings':
+        return <Settings />;
+      default:
+        return <ConsultantHome />;
+    }
+  };
+
+  return (
+    <Layout>
+      {renderCurrentView()}
+    </Layout>
+  );
 }
 
 export default App;
+

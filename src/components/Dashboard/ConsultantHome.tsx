@@ -1,334 +1,317 @@
-import React from 'react';
-import { 
-  Clock, AlertCircle, Calendar, TrendingUp, 
-  Users, Briefcase, Target, ChevronRight, ArrowUp, ArrowDown
+import {
+  CheckSquare, Briefcase, TrendingUp,
+  Clock, AlertTriangle, Target
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-
-dayjs.extend(relativeTime);
+import dayjs from '../../lib/dayjs-config';
 
 export default function ConsultantHome() {
-  const { 
-    getTodayTasks, 
-    getWeekTasks, 
-    getOverdueTasks,
-    getNextSteps,
-    clients,
+  const {
+    tasks,
     projects,
+    clients,
     opportunities,
     timeEntries,
-    openDrawer,
-    updateTask
+    risks
   } = useStore();
 
-  const todayTasks = getTodayTasks();
-  const weekTasks = getWeekTasks();
-  const overdueTasks = getOverdueTasks();
-  const nextSteps = getNextSteps();
-  
   // Calculate metrics
-  const activeProjects = projects.filter(p => p.kind === 'Active').length;
-  const totalClients = clients.length;
-  const openOpportunities = opportunities.filter(o => !o.stage.includes('Closed')).length;
-  const pipelineValue = opportunities
-    .filter(o => !o.stage.includes('Closed'))
-    .reduce((sum, o) => sum + (o.amount || 0) * o.probability, 0);
-  
-  // Today's time tracked
-  const todayHours = timeEntries
-    .filter(e => dayjs(e.date).isSame(dayjs(), 'day'))
-    .reduce((sum, e) => sum + e.hours, 0);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Todo': return 'bg-[var(--todo)]';
-      case 'Doing': return 'bg-[var(--doing)]';
-      case 'Blocked': return 'bg-[var(--blocked)]';
-      case 'Done': return 'bg-[var(--done)]';
-      default: return 'bg-[var(--ring)]';
+  const metrics = {
+    tasks: {
+      total: tasks.length,
+      completed: tasks.filter(t => t.status === 'Done').length,
+      overdue: tasks.filter(t => t.due && dayjs(t.due).isBefore(dayjs(), 'day')).length,
+      nextSteps: tasks.filter(t => t.isNextStep).length
+    },
+    projects: {
+      total: projects.length,
+      active: projects.filter(p => p.kind === 'Active').length,
+      onHold: projects.filter(p => p.kind === 'On Hold').length
+    },
+    clients: {
+      total: clients.length,
+      key: clients.filter(c => c.isKeyAccount).length
+    },
+    opportunities: {
+      total: opportunities.length,
+      value: opportunities.reduce((sum, opp) => sum + (opp.value || 0), 0),
+      qualified: opportunities.filter(o => o.stage === 'Qualified').length
+    },
+    time: {
+      today: timeEntries
+        .filter(entry => dayjs(entry.date).isSame(dayjs(), 'day'))
+        .reduce((sum, entry) => sum + entry.duration, 0),
+      week: timeEntries
+        .filter(entry => dayjs(entry.date).isSame(dayjs(), 'week'))
+        .reduce((sum, entry) => sum + entry.duration, 0)
+    },
+    risks: {
+      high: risks.filter(r => r.impact === 'High' && r.probability === 'High').length,
+      total: risks.length
     }
   };
 
-  const getPriorityIcon = (priority: number) => {
-    if (priority >= 4) return <ArrowUp className="text-[var(--danger)]" size={14} />;
-    if (priority >= 2) return <ArrowDown className="text-[var(--warn)]" size={14} />;
-    return null;
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
   };
 
+  const upcomingTasks = tasks
+    .filter(t => t.status !== 'Done' && t.due)
+    .sort((a, b) => new Date(a.due!).getTime() - new Date(b.due!).getTime())
+    .slice(0, 5);
+
+  const recentProjects = projects
+    .filter(p => p.kind === 'Active')
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+    .slice(0, 3);
+
+  const topOpportunities = opportunities
+    .filter(o => o.stage !== 'Closed Won' && o.stage !== 'Closed Lost')
+    .sort((a, b) => (b.value || 0) - (a.value || 0))
+    .slice(0, 3);
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold mb-2">Consultant Home</h1>
-        <p className="text-muted">
-          {dayjs().format('dddd, MMMM D, YYYY')} • {todayHours.toFixed(1)}h tracked today
-        </p>
+    <div className="h-full overflow-auto p-6 space-y-6">
+      {/* Welcome */}
+      <div>
+        <h1 className="text-3xl font-bold mb-2">Good morning! 👋</h1>
+        <p className="text-muted">Here's what's happening with your work today.</p>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <div className="card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-muted text-sm">Active Projects</span>
-            <Briefcase size={18} className="text-muted" />
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Tasks */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <CheckSquare className="text-[var(--accent)]" size={24} />
+            <span className="text-2xl font-bold">{metrics.tasks.total}</span>
           </div>
-          <div className="text-2xl font-semibold">{activeProjects}</div>
-          <div className="text-xs text-muted mt-1">
-            {projects.filter(p => p.kind === 'Planned').length} planned
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-muted text-sm">Clients</span>
-            <Users size={18} className="text-muted" />
-          </div>
-          <div className="text-2xl font-semibold">{totalClients}</div>
-          <div className="text-xs text-muted mt-1">
-            {clients.filter(c => c.tags.includes('Signed')).length} active
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-muted text-sm">Pipeline</span>
-            <TrendingUp size={18} className="text-muted" />
-          </div>
-          <div className="text-2xl font-semibold">{formatCurrency(pipelineValue)}</div>
-          <div className="text-xs text-muted mt-1">
-            {openOpportunities} opportunities
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-muted text-sm">Today's Focus</span>
-            <Target size={18} className="text-muted" />
-          </div>
-          <div className="text-2xl font-semibold">{todayTasks.length}</div>
-          <div className="text-xs text-[var(--danger)] mt-1">
-            {overdueTasks.length > 0 && `${overdueTasks.length} overdue`}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-6">
-        {/* Today's Tasks */}
-        <div className="col-span-2">
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold flex items-center gap-2">
-                <Clock size={18} />
-                Today's Tasks
-              </h2>
-              <span className="text-sm text-muted">{todayTasks.length} items</span>
+          <h3 className="font-semibold mb-2">Tasks</h3>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted">Completed</span>
+              <span>{metrics.tasks.completed}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Overdue</span>
+              <span className="text-[var(--danger)]">{metrics.tasks.overdue}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Next Steps</span>
+              <span className="text-[var(--accent)]">{metrics.tasks.nextSteps}</span>
+            </div>
+          </div>
+        </div>
 
-            {overdueTasks.length > 0 && (
-              <div className="mb-4 p-3 bg-[var(--danger)] bg-opacity-10 rounded-lg border border-[var(--danger)] border-opacity-20">
-                <div className="flex items-center gap-2 text-[var(--danger)] mb-2">
-                  <AlertCircle size={16} />
-                  <span className="font-medium text-sm">Overdue Tasks</span>
-                </div>
-                {overdueTasks.slice(0, 3).map(task => (
-                  <div 
-                    key={task.id} 
-                    className="flex items-center justify-between py-2 border-b border-[var(--border)] last:border-0"
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        className="rounded"
-                        onChange={() => updateTask(task.id, { status: 'Done' })}
-                      />
-                      <span className="text-sm">{task.title}</span>
+        {/* Projects */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <Briefcase className="text-[var(--accent)]" size={24} />
+            <span className="text-2xl font-bold">{metrics.projects.total}</span>
+          </div>
+          <h3 className="font-semibold mb-2">Projects</h3>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted">Active</span>
+              <span className="text-[var(--success)]">{metrics.projects.active}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">On Hold</span>
+              <span className="text-[var(--warn)]">{metrics.projects.onHold}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Opportunities */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <TrendingUp className="text-[var(--accent)]" size={24} />
+            <span className="text-2xl font-bold">{metrics.opportunities.total}</span>
+          </div>
+          <h3 className="font-semibold mb-2">Pipeline</h3>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted">Total Value</span>
+              <span className="text-[var(--success)]">${metrics.opportunities.value.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Qualified</span>
+              <span>{metrics.opportunities.qualified}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Time */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <Clock className="text-[var(--accent)]" size={24} />
+            <span className="text-2xl font-bold">{formatDuration(metrics.time.today)}</span>
+          </div>
+          <h3 className="font-semibold mb-2">Time Today</h3>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted">This Week</span>
+              <span>{formatDuration(metrics.time.week)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Upcoming Tasks */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Target size={20} />
+              Upcoming Tasks
+            </h3>
+            <span className="text-sm text-muted">{upcomingTasks.length} tasks</span>
+          </div>
+          
+          <div className="space-y-3">
+            {upcomingTasks.map(task => {
+              const isOverdue = dayjs(task.due).isBefore(dayjs(), 'day');
+              const isToday = dayjs(task.due).isSame(dayjs(), 'day');
+              const isTomorrow = dayjs(task.due).isSame(dayjs().add(1, 'day'), 'day');
+              
+              return (
+                <div key={task.id} className="flex items-center justify-between p-3 bg-elevated rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium">{task.title}</div>
+                    <div className="text-sm text-muted">
+                      {isOverdue && <span className="text-[var(--danger)]">Overdue</span>}
+                      {isToday && <span className="text-[var(--warn)]">Today</span>}
+                      {isTomorrow && <span className="text-[var(--accent)]">Tomorrow</span>}
+                      {!isOverdue && !isToday && !isTomorrow && dayjs(task.due).format('MMM D')}
                     </div>
-                    <span className="text-xs text-[var(--danger)]">
-                      {dayjs(task.due).fromNow()}
-                    </span>
                   </div>
-                ))}
+                  <div className="text-sm font-medium">
+                    {task.score.toFixed(1)}
+                  </div>
+                </div>
+              );
+            })}
+            
+            {upcomingTasks.length === 0 && (
+              <div className="text-center text-muted py-8">
+                No upcoming tasks with due dates
               </div>
             )}
-
-            <div className="space-y-2">
-              {todayTasks.length === 0 ? (
-                <p className="text-muted text-sm py-8 text-center">
-                  No tasks scheduled for today
-                </p>
-              ) : (
-                todayTasks.map(task => (
-                  <div 
-                    key={task.id}
-                    className="row cursor-pointer"
-                    onClick={() => openDrawer(task, 'task')}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={task.status === 'Done'}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        updateTask(task.id, { 
-                          status: task.status === 'Done' ? 'Todo' : 'Done' 
-                        });
-                      }}
-                      className="rounded"
-                    />
-                    <span className={`status-dot ${getStatusColor(task.status)}`} />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={task.status === 'Done' ? 'line-through opacity-50' : ''}>
-                          {task.title}
-                        </span>
-                        {task.isNextStep && (
-                          <span className="text-xs px-1.5 py-0.5 bg-[var(--accent)] text-white rounded">
-                            Next Step
-                          </span>
-                        )}
-                        {getPriorityIcon(task.priority)}
-                      </div>
-                      {task.clientId && (
-                        <span className="text-xs text-muted">
-                          {clients.find(c => c.id === task.clientId)?.name}
-                        </span>
-                      )}
-                    </div>
-                    <span className="ice-score">{task.score.toFixed(1)}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Next Steps */}
-          <div className="card mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold flex items-center gap-2">
-                <Target size={18} />
-                Next Steps
-              </h2>
-              <span className="text-sm text-muted">{nextSteps.length} items</span>
-            </div>
-
-            <div className="space-y-3">
-              {nextSteps.slice(0, 5).map((item: any) => {
-                const isTask = 'status' in item;
-                const dueDate = isTask ? item.due : item.nextStepDue;
-                const title = isTask ? item.title : item.nextStep;
-                const entityName = isTask ? 'Task' : ('clients' in item ? 'Project' : 'Client');
-                
-                return (
-                  <div key={item.id} className="flex items-start gap-3 p-3 bg-elevated rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{title}</div>
-                      <div className="text-xs text-muted mt-1">
-                        {entityName} • {item.name || item.title}
-                      </div>
-                    </div>
-                    {dueDate && (
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        dayjs(dueDate).isBefore(dayjs()) 
-                          ? 'chip-overdue' 
-                          : dayjs(dueDate).isBefore(dayjs().add(3, 'day'))
-                          ? 'chip-soon'
-                          : 'chip-date'
-                      }`}>
-                        {dayjs(dueDate).format('MMM D')}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
 
-        {/* Right Column */}
-        <div className="space-y-6">
-          {/* This Week */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Calendar size={18} />
-                This Week
-              </h3>
-              <span className="text-sm text-muted">{weekTasks.length}</span>
-            </div>
-            <div className="space-y-2">
-              {weekTasks.slice(0, 5).map(task => (
-                <div key={task.id} className="flex items-center justify-between py-2">
-                  <span className="text-sm truncate flex-1 mr-2">{task.title}</span>
+        {/* Active Projects */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Briefcase size={20} />
+              Active Projects
+            </h3>
+            <span className="text-sm text-muted">{recentProjects.length} projects</span>
+          </div>
+          
+          <div className="space-y-3">
+            {recentProjects.map(project => (
+              <div key={project.id} className="p-3 bg-elevated rounded-lg">
+                <div className="font-medium mb-1">{project.title}</div>
+                <div className="text-sm text-muted mb-2">
+                  {clients.find(c => c.id === project.clientId)?.name}
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-xs text-muted">
-                    {dayjs(task.due).format('ddd')}
+                    Updated {dayjs(project.updatedAt || project.createdAt).fromNow()}
+                  </span>
+                  <span className={`tag text-xs ${
+                    project.kind === 'Active' ? 'bg-[var(--success)] text-white' : ''
+                  }`}>
+                    {project.kind}
                   </span>
                 </div>
-              ))}
-              {weekTasks.length === 0 && (
-                <p className="text-sm text-muted">No tasks this week</p>
-              )}
-            </div>
+              </div>
+            ))}
+            
+            {recentProjects.length === 0 && (
+              <div className="text-center text-muted py-8">
+                No active projects
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* Active Opportunities */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <TrendingUp size={18} />
-                Pipeline
-              </h3>
-              <ChevronRight size={16} className="text-muted" />
-            </div>
-            <div className="space-y-3">
-              {opportunities
-                .filter(o => !o.stage.includes('Closed'))
-                .slice(0, 3)
-                .map(opp => (
-                  <div key={opp.id} className="pb-3 border-b border-[var(--border)] last:border-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium truncate flex-1 mr-2">
-                        {opp.name}
-                      </span>
-                      <span className="text-xs tag">{opp.stage}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted">
-                        {clients.find(c => c.id === opp.clientId)?.name}
-                      </span>
-                      <span className="text-xs font-medium">
-                        {formatCurrency(opp.amount || 0)}
-                      </span>
-                    </div>
+        {/* Top Opportunities */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <TrendingUp size={20} />
+              Top Opportunities
+            </h3>
+            <span className="text-sm text-muted">{topOpportunities.length} opportunities</span>
+          </div>
+          
+          <div className="space-y-3">
+            {topOpportunities.map(opp => (
+              <div key={opp.id} className="p-3 bg-elevated rounded-lg">
+                <div className="flex items-start justify-between mb-1">
+                  <div className="font-medium">{opp.title}</div>
+                  <div className="text-sm font-semibold text-[var(--success)]">
+                    ${(opp.value || 0).toLocaleString()}
                   </div>
-                ))}
-            </div>
+                </div>
+                <div className="text-sm text-muted mb-2">
+                  {clients.find(c => c.id === opp.clientId)?.name}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={`tag text-xs ${
+                    opp.stage === 'Qualified' ? 'bg-[var(--accent)] text-white' :
+                    opp.stage === 'Proposal' ? 'bg-[var(--warn)] text-white' :
+                    'bg-[var(--ring)]'
+                  }`}>
+                    {opp.stage}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {opp.probability}% probability
+                  </span>
+                </div>
+              </div>
+            ))}
+            
+            {topOpportunities.length === 0 && (
+              <div className="text-center text-muted py-8">
+                No open opportunities
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* Quick Actions */}
-          <div className="card">
-            <h3 className="font-semibold mb-3">Quick Actions</h3>
-            <div className="space-y-2">
-              <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-elevated transition-colors text-sm">
-                📝 Weekly Review
-              </button>
-              <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-elevated transition-colors text-sm">
-                ⏱️ Start Timer
-              </button>
-              <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-elevated transition-colors text-sm">
-                📊 Export Time Report
-              </button>
-              <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-elevated transition-colors text-sm">
-                🎯 Review OKRs
-              </button>
+        {/* Risk Summary */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <AlertTriangle size={20} />
+              Risk Summary
+            </h3>
+            <span className="text-sm text-muted">{metrics.risks.total} total</span>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm">High Risk Items</span>
+              <span className={`text-lg font-semibold ${
+                metrics.risks.high > 0 ? 'text-[var(--danger)]' : 'text-[var(--success)]'
+              }`}>
+                {metrics.risks.high}
+              </span>
+            </div>
+            
+            <div className="text-center text-muted py-4">
+              {metrics.risks.high === 0 ? (
+                <span className="text-[var(--success)]">No high-risk items</span>
+              ) : (
+                <span>Review high-risk items in RAID log</span>
+              )}
             </div>
           </div>
         </div>

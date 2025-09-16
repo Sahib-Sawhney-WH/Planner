@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  CheckSquare, Plus, Filter, Grid3x3, List, Calendar,
-  ArrowUpDown, MoreVertical, Clock, Tag, Link,
-  Trash2, Edit, Copy, Archive, ChevronDown, Target
+  CheckSquare, Plus, Filter, Grid3x3, List,
+  MoreVertical, Target
 } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import dayjs from 'dayjs';
@@ -16,8 +15,6 @@ export default function TaskList() {
     updateTask,
     deleteTask,
     bulkUpdateTasks,
-    setTaskFilter,
-    taskFilter,
     openDrawer
   } = useStore();
 
@@ -140,7 +137,7 @@ export default function TaskList() {
 
       <div 
         className="flex-1 cursor-pointer"
-        onClick={() => openDrawer(task)}
+        onClick={() => openDrawer(task, 'task')}
       >
         <div className="flex items-center gap-2">
           <span className={task.status === 'Done' ? 'line-through opacity-50' : ''}>
@@ -195,7 +192,7 @@ export default function TaskList() {
           <div
             key={task.id}
             className="card p-3 cursor-pointer hover:shadow-lg transition-all"
-            onClick={() => openDrawer(task)}
+            onClick={() => openDrawer(task, 'task')}
           >
             <div className="flex items-start justify-between mb-2">
               <span className="text-sm font-medium">{task.title}</span>
@@ -227,186 +224,134 @@ export default function TaskList() {
                   <span className="text-xs text-muted">+{task.tags.length - 2}</span>
                 )}
               </div>
+              
               <div className="flex items-center gap-2">
                 {getDueDateChip(task.due)}
-                <span className="text-xs font-medium text-[var(--accent)]">
-                  {task.score.toFixed(1)}
-                </span>
+                <span className="ice-score text-xs">{task.score.toFixed(1)}</span>
               </div>
             </div>
           </div>
         ))}
-        
-        {tasks.length === 0 && (
-          <div className="text-center py-8 text-muted text-sm">
-            No tasks
-          </div>
-        )}
       </div>
     </div>
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-default">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold flex items-center gap-2">
-            <CheckSquare size={24} />
+      <div className="flex items-center justify-between p-6 border-b border-default">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold flex items-center gap-3">
+            <CheckSquare className="text-[var(--accent)]" size={28} />
             Tasks
           </h1>
           
-          <div className="flex items-center gap-2">
-            {/* View mode toggle */}
-            <div className="flex items-center bg-elevated rounded-lg p-1">
+          {selectedTasks.size > 0 && (
+            <div className="flex items-center gap-2 ml-4">
+              <span className="text-sm text-muted">{selectedTasks.size} selected</span>
               <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded transition-colors ${
-                  viewMode === 'list' ? 'bg-[var(--accent)] text-white' : ''
-                }`}
+                onClick={() => handleBulkAction('done')}
+                className="btn btn-sm"
               >
-                <List size={16} />
+                Mark Done
               </button>
               <button
-                onClick={() => setViewMode('kanban')}
-                className={`p-1.5 rounded transition-colors ${
-                  viewMode === 'kanban' ? 'bg-[var(--accent)] text-white' : ''
-                }`}
+                onClick={() => handleBulkAction('todo')}
+                className="btn btn-sm btn-ghost"
               >
-                <Grid3x3 size={16} />
+                Mark Todo
+              </button>
+              <button
+                onClick={() => handleBulkAction('delete')}
+                className="btn btn-sm btn-ghost text-[var(--danger)]"
+              >
+                Delete
               </button>
             </div>
-
-            {/* Sort */}
-            <button
-              onClick={() => {
-                const nextSort = sortBy === 'score' ? 'due' : sortBy === 'due' ? 'priority' : 'score';
-                setSortBy(nextSort);
-              }}
-              className="btn btn-ghost flex items-center gap-2"
-            >
-              <ArrowUpDown size={16} />
-              Sort: {sortBy}
-            </button>
-
-            {/* Filter */}
-            <button
-              onClick={() => setFilterOpen(!filterOpen)}
-              className="btn btn-ghost flex items-center gap-2"
-            >
-              <Filter size={16} />
-              Filter
-              {(taskFilter.status || taskFilter.clientId || taskFilter.projectId) && (
-                <span className="w-2 h-2 bg-[var(--accent)] rounded-full" />
-              )}
-            </button>
-
-            {/* Quick add */}
-            <button
-              onClick={() => setQuickAddOpen(true)}
-              className="btn flex items-center gap-2"
-            >
-              <Plus size={16} />
-              Add Task
-            </button>
-          </div>
+          )}
         </div>
 
-        {/* Active filters */}
-        {(taskFilter.status || taskFilter.clientId || taskFilter.projectId) && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted">Active filters:</span>
-            {taskFilter.status && (
-              <span className="tag text-xs">
-                Status: {taskFilter.status}
-                <button
-                  onClick={() => setTaskFilter({ ...taskFilter, status: undefined })}
-                  className="ml-1"
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {taskFilter.clientId && (
-              <span className="tag text-xs">
-                Client: {clients.find(c => c.id === taskFilter.clientId)?.name}
-                <button
-                  onClick={() => setTaskFilter({ ...taskFilter, clientId: undefined })}
-                  className="ml-1"
-                >
-                  ×
-                </button>
-              </span>
-            )}
+        <div className="flex items-center gap-3">
+          {/* View toggle */}
+          <div className="flex items-center bg-elevated rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded transition-colors ${
+                viewMode === 'list' ? 'bg-[var(--accent)] text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              <List size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`p-2 rounded transition-colors ${
+                viewMode === 'kanban' ? 'bg-[var(--accent)] text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              <Grid3x3 size={16} />
+            </button>
           </div>
-        )}
+
+          {/* Sort */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="input w-32"
+          >
+            <option value="score">ICE Score</option>
+            <option value="due">Due Date</option>
+            <option value="priority">Priority</option>
+          </select>
+
+          {/* Filter */}
+          <button
+            onClick={() => setFilterOpen(!filterOpen)}
+            className="btn btn-ghost"
+          >
+            <Filter size={16} />
+          </button>
+
+          {/* Quick add */}
+          <button
+            onClick={() => setQuickAddOpen(true)}
+            className="btn"
+          >
+            <Plus size={16} />
+            Add Task
+          </button>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto p-6">
         {viewMode === 'list' ? (
-          <div>
+          <div className="space-y-1">
             {sortedTasks.map(renderTaskRow)}
           </div>
         ) : (
-          <div className="flex gap-4 p-6 h-full">
-            {Object.entries(tasksByStatus).map(([status, tasks]) => 
+          <div className="flex gap-6 h-full overflow-x-auto">
+            {Object.entries(tasksByStatus).map(([status, tasks]) =>
               renderKanbanColumn(status, tasks)
             )}
           </div>
         )}
       </div>
 
-      {/* Bulk actions footer */}
-      {selectedTasks.size > 0 && (
-        <div className="h-14 px-6 border-t border-default flex items-center justify-between bg-elevated">
-          <span className="text-sm text-muted">
-            {selectedTasks.size} task{selectedTasks.size > 1 ? 's' : ''} selected
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleBulkAction('done')}
-              className="btn btn-ghost text-sm"
-            >
-              Mark Done
-            </button>
-            <button
-              onClick={() => handleBulkAction('todo')}
-              className="btn btn-ghost text-sm"
-            >
-              Mark Todo
-            </button>
-            <button
-              onClick={() => handleBulkAction('delete')}
-              className="btn btn-ghost text-sm text-[var(--danger)]"
-            >
-              Delete
-            </button>
-            <button
-              onClick={() => setSelectedTasks(new Set())}
-              className="btn btn-ghost text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Quick add modal */}
       {quickAddOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="card w-[500px] p-6 animate-slideDown">
-            <h2 className="text-lg font-semibold mb-4">Quick Add Task</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card w-96 p-6">
+            <h3 className="text-lg font-semibold mb-4">Add New Task</h3>
             <input
               type="text"
-              className="input mb-4"
               placeholder="Task title..."
               value={quickAddTitle}
               onChange={(e) => setQuickAddTitle(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleQuickAdd()}
+              className="input w-full mb-4"
               autoFocus
             />
-            <div className="flex justify-end gap-2">
+            <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setQuickAddOpen(false)}
                 className="btn btn-ghost"
@@ -423,67 +368,7 @@ export default function TaskList() {
           </div>
         </div>
       )}
-
-      {/* Filter dropdown */}
-      {filterOpen && (
-        <div className="absolute right-6 top-20 card w-[300px] p-4 z-30 animate-slideDown">
-          <h3 className="font-medium mb-3">Filter Tasks</h3>
-          
-          <div className="mb-3">
-            <label className="label">Status</label>
-            <select
-              className="input"
-              value={taskFilter.status || ''}
-              onChange={(e) => setTaskFilter({ ...taskFilter, status: e.target.value as any || undefined })}
-            >
-              <option value="">All</option>
-              <option value="Inbox">Inbox</option>
-              <option value="Todo">Todo</option>
-              <option value="Doing">Doing</option>
-              <option value="Blocked">Blocked</option>
-              <option value="Done">Done</option>
-            </select>
-          </div>
-
-          <div className="mb-3">
-            <label className="label">Client</label>
-            <select
-              className="input"
-              value={taskFilter.clientId || ''}
-              onChange={(e) => setTaskFilter({ ...taskFilter, clientId: e.target.value || undefined })}
-            >
-              <option value="">All</option>
-              {clients.map(client => (
-                <option key={client.id} value={client.id}>{client.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mb-3">
-            <label className="label">Project</label>
-            <select
-              className="input"
-              value={taskFilter.projectId || ''}
-              onChange={(e) => setTaskFilter({ ...taskFilter, projectId: e.target.value || undefined })}
-            >
-              <option value="">All</option>
-              {projects.map(project => (
-                <option key={project.id} value={project.id}>{project.title}</option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            onClick={() => {
-              setTaskFilter({});
-              setFilterOpen(false);
-            }}
-            className="w-full btn btn-ghost text-sm"
-          >
-            Clear Filters
-          </button>
-        </div>
-      )}
     </div>
   );
 }
+
