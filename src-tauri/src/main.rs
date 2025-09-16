@@ -1,151 +1,192 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{CustomMenuItem, Menu, MenuItem, Submenu, SystemTray, SystemTrayMenu, SystemTrayMenuItem};
-use tauri::{Manager, SystemTrayEvent};
+use tauri::{
+    Manager,
+    menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+};
+
+#[derive(Clone, serde::Serialize)]
+struct Payload {
+    message: String,
+}
 
 fn main() {
-    // Create system tray
-    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    let hide = CustomMenuItem::new("hide".to_string(), "Hide");
-    let show = CustomMenuItem::new("show".to_string(), "Show");
-    let tray_menu = SystemTrayMenu::new()
-        .add_item(show)
-        .add_item(hide)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(quit);
-    let system_tray = SystemTray::new().with_menu(tray_menu);
-
-    // Create app menu
-    let submenu_file = Submenu::new(
-        "File",
-        Menu::new()
-            .add_native_item(MenuItem::Separator)
-            .add_item(CustomMenuItem::new("backup", "Backup Data").accelerator("Ctrl+B"))
-            .add_item(CustomMenuItem::new("export", "Export...").accelerator("Ctrl+E"))
-            .add_item(CustomMenuItem::new("import", "Import...").accelerator("Ctrl+I"))
-            .add_native_item(MenuItem::Separator)
-            .add_native_item(MenuItem::Quit),
-    );
-
-    let submenu_edit = Submenu::new(
-        "Edit",
-        Menu::new()
-            .add_native_item(MenuItem::Undo)
-            .add_native_item(MenuItem::Redo)
-            .add_native_item(MenuItem::Separator)
-            .add_native_item(MenuItem::Cut)
-            .add_native_item(MenuItem::Copy)
-            .add_native_item(MenuItem::Paste)
-            .add_native_item(MenuItem::SelectAll),
-    );
-
-    let submenu_view = Submenu::new(
-        "View",
-        Menu::new()
-            .add_item(CustomMenuItem::new("tasks", "Tasks").accelerator("Ctrl+1"))
-            .add_item(CustomMenuItem::new("projects", "Projects").accelerator("Ctrl+2"))
-            .add_item(CustomMenuItem::new("clients", "Clients").accelerator("Ctrl+3"))
-            .add_native_item(MenuItem::Separator)
-            .add_item(CustomMenuItem::new("presenter", "Presenter Mode").accelerator("Ctrl+Shift+P"))
-            .add_native_item(MenuItem::Separator)
-            .add_native_item(MenuItem::EnterFullScreen),
-    );
-
-    let submenu_tools = Submenu::new(
-        "Tools",
-        Menu::new()
-            .add_item(CustomMenuItem::new("timer", "Start Timer").accelerator("Ctrl+T"))
-            .add_item(CustomMenuItem::new("capture", "Quick Capture").accelerator("Ctrl+Shift+N"))
-            .add_native_item(MenuItem::Separator)
-            .add_item(CustomMenuItem::new("review", "Weekly Review").accelerator("Ctrl+R"))
-            .add_item(CustomMenuItem::new("settings", "Settings").accelerator("Ctrl+,")),
-    );
-
-    let menu = Menu::new()
-        .add_submenu(submenu_file)
-        .add_submenu(submenu_edit)
-        .add_submenu(submenu_view)
-        .add_submenu(submenu_tools);
-
     tauri::Builder::default()
-        .menu(menu)
-        .system_tray(system_tray)
-        .on_menu_event(|event| match event.menu_item_id() {
-            "backup" => {
-                // Handle backup
-                println!("Backup triggered");
-            }
-            "export" => {
-                // Handle export
-                println!("Export triggered");
-            }
-            "import" => {
-                // Handle import
-                println!("Import triggered");
-            }
-            "tasks" | "projects" | "clients" => {
-                // Navigate to view
-                event.window().emit("navigate", event.menu_item_id()).unwrap();
-            }
-            "presenter" => {
-                // Toggle presenter mode
-                event.window().emit("toggle-presenter", {}).unwrap();
-            }
-            "timer" => {
-                // Start timer
-                event.window().emit("start-timer", {}).unwrap();
-            }
-            "capture" => {
-                // Quick capture
-                event.window().emit("quick-capture", {}).unwrap();
-            }
-            "review" => {
-                // Weekly review
-                event.window().emit("weekly-review", {}).unwrap();
-            }
-            "settings" => {
-                // Open settings
-                event.window().emit("open-settings", {}).unwrap();
-            }
-            _ => {}
-        })
-        .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::LeftClick {
-                position: _,
-                size: _,
-                ..
-            } => {
-                let window = app.get_window("main").unwrap();
-                window.show().unwrap();
-                window.set_focus().unwrap();
-            }
-            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                "quit" => {
-                    std::process::exit(0);
+        .setup(|app| {
+            // Create app menu
+            let app_menu = Submenu::new(
+                app,
+                "File",
+                Menu::with_items(app, &[
+                    &MenuItem::with_id(app, "backup", "Backup Data", true, Some("Ctrl+B"))?,
+                    &MenuItem::with_id(app, "export", "Export...", true, Some("Ctrl+E"))?,
+                    &MenuItem::with_id(app, "import", "Import...", true, Some("Ctrl+I"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::quit(app, None)?,
+                ])?,
+            )?;
+
+            let edit_menu = Submenu::new(
+                app,
+                "Edit",
+                Menu::with_items(app, &[
+                    &PredefinedMenuItem::undo(app, None)?,
+                    &PredefinedMenuItem::redo(app, None)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::cut(app, None)?,
+                    &PredefinedMenuItem::copy(app, None)?,
+                    &PredefinedMenuItem::paste(app, None)?,
+                    &PredefinedMenuItem::select_all(app, None)?,
+                ])?,
+            )?;
+
+            let view_menu = Submenu::new(
+                app,
+                "View",
+                Menu::with_items(app, &[
+                    &MenuItem::with_id(app, "tasks", "Tasks", true, Some("Ctrl+1"))?,
+                    &MenuItem::with_id(app, "projects", "Projects", true, Some("Ctrl+2"))?,
+                    &MenuItem::with_id(app, "clients", "Clients", true, Some("Ctrl+3"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(app, "presenter", "Presenter Mode", true, Some("Ctrl+Shift+P"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::fullscreen(app, None)?,
+                ])?,
+            )?;
+
+            let tools_menu = Submenu::new(
+                app,
+                "Tools",
+                Menu::with_items(app, &[
+                    &MenuItem::with_id(app, "timer", "Start Timer", true, Some("Ctrl+T"))?,
+                    &MenuItem::with_id(app, "capture", "Quick Capture", true, Some("Ctrl+Shift+N"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(app, "review", "Weekly Review", true, Some("Ctrl+R"))?,
+                    &MenuItem::with_id(app, "settings", "Settings", true, Some("Ctrl+,"))?,
+                ])?,
+            )?;
+
+            let menu = Menu::with_items(app, &[
+                &app_menu,
+                &edit_menu,
+                &view_menu,
+                &tools_menu,
+            ])?;
+
+            app.set_menu(menu)?;
+
+            // Create system tray
+            let tray_menu = Menu::with_items(app, &[
+                &MenuItem::with_id(app, "show", "Show", true, None)?,
+                &MenuItem::with_id(app, "hide", "Hide", true, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &MenuItem::with_id(app, "quit_tray", "Quit", true, None)?,
+            ])?;
+
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&tray_menu)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        },
+                        "hide" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.hide();
+                            }
+                        },
+                        "quit_tray" => {
+                            app.exit(0);
+                        },
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|app, event| {
+                    match event {
+                        TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        },
+                        _ => {}
+                    }
+                })
+                .build(app)?;
+
+            // Handle menu events
+            app.on_menu_event(|app, event| {
+                match event.id.as_ref() {
+                    "backup" => {
+                        println!("Backup triggered");
+                    },
+                    "export" => {
+                        println!("Export triggered");
+                    },
+                    "import" => {
+                        println!("Import triggered");
+                    },
+                    "tasks" | "projects" | "clients" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.emit("navigate", event.id.as_ref());
+                        }
+                    },
+                    "presenter" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.emit("toggle-presenter", ());
+                        }
+                    },
+                    "timer" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.emit("start-timer", ());
+                        }
+                    },
+                    "capture" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.emit("quick-capture", ());
+                        }
+                    },
+                    "review" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.emit("weekly-review", ());
+                        }
+                    },
+                    "settings" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.emit("open-settings", ());
+                        }
+                    },
+                    _ => {}
                 }
-                "hide" => {
-                    let window = app.get_window("main").unwrap();
-                    window.hide().unwrap();
-                }
-                "show" => {
-                    let window = app.get_window("main").unwrap();
-                    window.show().unwrap();
-                    window.set_focus().unwrap();
-                }
-                _ => {}
-            },
-            _ => {}
-        })
-        .on_window_event(|event| match event.event() {
-            tauri::WindowEvent::CloseRequested { api, .. } => {
-                // Hide to tray instead of closing
-                event.window().hide().unwrap();
-                api.prevent_close();
+            });
+
+            // Handle window close event - hide to tray instead of closing
+            if let Some(window) = app.get_webview_window("main") {
+                window.on_window_event(|event| {
+                    match event {
+                        tauri::WindowEvent::CloseRequested { api, .. } => {
+                            api.prevent_close();
+                            let _ = event.window().hide();
+                        },
+                        _ => {}
+                    }
+                });
             }
-            _ => {}
+
+            Ok(())
         })
-        .invoke_handler(tauri::generate_handler![])
+        .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

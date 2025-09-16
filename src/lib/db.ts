@@ -1,22 +1,11 @@
-// src/lib/db.ts
-import Database from 'better-sqlite3';
-import { exists, createDir } from '@tauri-apps/api/fs';
-import { appDataDir } from '@tauri-apps/api/path';
+import Database from '@tauri-apps/plugin-sql';
 
-// Fixed: Use proper type annotation for better-sqlite3
-let db: Database.Database | null = null;
+let db: Database | null = null;
 
 export async function initDB() {
   try {
-    // Ensure app data directory exists
-    const appDir = await appDataDir();
-    if (!(await exists(appDir))) {
-      await createDir(appDir, { recursive: true });
-    }
-
-    // Fixed: Use correct better-sqlite3 constructor
-    const dbPath = `${appDir}/planner.db`;
-    db = new Database(dbPath);
+    // Load the SQLite database
+    db = await Database.load('sqlite:planner.db');
     
     // Run migrations
     await runMigrations();
@@ -28,7 +17,7 @@ export async function initDB() {
   }
 }
 
-export function getDB(): Database.Database {
+export function getDB(): Database {
   if (!db) {
     throw new Error('Database not initialized. Call initDB() first.');
   }
@@ -39,7 +28,7 @@ async function runMigrations() {
   if (!db) throw new Error('Database not initialized');
 
   // Check if migrations table exists
-  db.exec(`
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS migrations (
       id INTEGER PRIMARY KEY,
       name TEXT UNIQUE,
@@ -228,14 +217,19 @@ async function runMigrations() {
     );
   `;
 
-  // Check if migration 001 has been run
-  const migration001Exists = db.prepare('SELECT * FROM migrations WHERE name = ?').all('001_initial');
+  // Check if migration 001 has been run - Fix the type issue here
+  const migration001Exists = await db.select<Array<{id: number, name: string, executed_at: string}>>('SELECT * FROM migrations WHERE name = ?', ['001_initial']);
 
-  if (migration001Exists.length === 0) {
-    // Execute the migration
-    db.exec(migration001);
+  if (migration001Exists && migration001Exists.length === 0) {
+    // Execute the migration - split by statements for SQLite
+    const statements = migration001.split(';').filter(s => s.trim());
+    for (const statement of statements) {
+      if (statement.trim()) {
+        await db.execute(statement);
+      }
+    }
     
-    db.prepare('INSERT INTO migrations (name) VALUES (?)').run('001_initial');
+    await db.execute('INSERT INTO migrations (name) VALUES (?)', ['001_initial']);
     console.log('Migration 001_initial completed');
   }
 }
@@ -244,4 +238,3 @@ async function runMigrations() {
 export function generateId(): string {
   return Math.random().toString(36).substr(2, 9);
 }
-
