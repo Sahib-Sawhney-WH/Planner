@@ -3,7 +3,8 @@ import Database from 'better-sqlite3';
 import { exists, createDir } from '@tauri-apps/api/fs';
 import { appDataDir } from '@tauri-apps/api/path';
 
-let db: Database | null = null;
+// Fixed: Use proper type annotation for better-sqlite3
+let db: Database.Database | null = null;
 
 export async function initDB() {
   try {
@@ -13,8 +14,9 @@ export async function initDB() {
       await createDir(appDir, { recursive: true });
     }
 
-    // Initialize database
-    db = await Database.load('sqlite:planner.db');
+    // Fixed: Use correct better-sqlite3 constructor
+    const dbPath = `${appDir}/planner.db`;
+    db = new Database(dbPath);
     
     // Run migrations
     await runMigrations();
@@ -26,11 +28,18 @@ export async function initDB() {
   }
 }
 
+export function getDB(): Database.Database {
+  if (!db) {
+    throw new Error('Database not initialized. Call initDB() first.');
+  }
+  return db;
+}
+
 async function runMigrations() {
   if (!db) throw new Error('Database not initialized');
 
   // Check if migrations table exists
-  await db.execute(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS migrations (
       id INTEGER PRIMARY KEY,
       name TEXT UNIQUE,
@@ -214,97 +223,25 @@ async function runMigrations() {
       tags TEXT DEFAULT '[]',
       isPublic BOOLEAN DEFAULT FALSE,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      lastAccessedAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `;
 
   // Check if migration 001 has been run
-  const migration001Exists = await db.select(
-    'SELECT * FROM migrations WHERE name = ?',
-    ['001_initial']
-  );
+  const migration001Exists = db.prepare('SELECT * FROM migrations WHERE name = ?').all('001_initial');
 
   if (migration001Exists.length === 0) {
-    await db.execute(migration001);
-    await db.execute(
-      'INSERT INTO migrations (name) VALUES (?)',
-      ['001_initial']
-    );
+    // Execute the migration
+    db.exec(migration001);
+    
+    db.prepare('INSERT INTO migrations (name) VALUES (?)').run('001_initial');
     console.log('Migration 001_initial completed');
-  }
-
-  // Migration 002: Full-text search
-  const migration002 = `
-    -- Create FTS tables for search
-    CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
-      id, title, description, content='tasks', content_rowid='rowid'
-    );
-
-    CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
-      id, title, content, content='notes', content_rowid='rowid'
-    );
-
-    CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_fts USING fts5(
-      id, title, content, content='knowledge', content_rowid='rowid'
-    );
-
-    -- Triggers to keep FTS in sync
-    CREATE TRIGGER IF NOT EXISTS tasks_fts_insert AFTER INSERT ON tasks BEGIN
-      INSERT INTO tasks_fts(id, title, description) VALUES (new.id, new.title, new.description);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS tasks_fts_update AFTER UPDATE ON tasks BEGIN
-      UPDATE tasks_fts SET title = new.title, description = new.description WHERE id = new.id;
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS tasks_fts_delete AFTER DELETE ON tasks BEGIN
-      DELETE FROM tasks_fts WHERE id = old.id;
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS notes_fts_insert AFTER INSERT ON notes BEGIN
-      INSERT INTO notes_fts(id, title, content) VALUES (new.id, new.title, new.content);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS notes_fts_update AFTER UPDATE ON notes BEGIN
-      UPDATE notes_fts SET title = new.title, content = new.content WHERE id = new.id;
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS notes_fts_delete AFTER DELETE ON notes BEGIN
-      DELETE FROM notes_fts WHERE id = old.id;
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS knowledge_fts_insert AFTER INSERT ON knowledge BEGIN
-      INSERT INTO knowledge_fts(id, title, content) VALUES (new.id, new.title, new.content);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS knowledge_fts_update AFTER UPDATE ON knowledge BEGIN
-      UPDATE knowledge_fts SET title = new.title, content = new.content WHERE id = new.id;
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS knowledge_fts_delete AFTER DELETE ON knowledge BEGIN
-      DELETE FROM knowledge_fts WHERE id = old.id;
-    END;
-  `;
-
-  const migration002Exists = await db.select(
-    'SELECT * FROM migrations WHERE name = ?',
-    ['002_fts']
-  );
-
-  if (migration002Exists.length === 0) {
-    await db.execute(migration002);
-    await db.execute(
-      'INSERT INTO migrations (name) VALUES (?)',
-      ['002_fts']
-    );
-    console.log('Migration 002_fts completed');
   }
 }
 
-export function getDB() {
-  if (!db) {
-    throw new Error('Database not initialized. Call initDB() first.');
-  }
-  return db;
+// Helper function to generate unique IDs
+export function generateId(): string {
+  return Math.random().toString(36).substr(2, 9);
 }
 

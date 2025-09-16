@@ -12,7 +12,7 @@ export default function KnowledgeRepository() {
   const {
     knowledge,
     createKnowledge,
-    updateKnowledge
+    // Removed unused updateKnowledge import
   } = useStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,7 +36,7 @@ export default function KnowledgeRepository() {
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.tags.some((t: any) => t.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesType = !filterType || item.sourceType === filterType;
+    const matchesType = !filterType || item.category === filterType;
     const matchesTag = !filterTag || item.tags.includes(filterTag);
     return matchesSearch && matchesType && matchesTag;
   });
@@ -79,14 +79,17 @@ export default function KnowledgeRepository() {
     }
   };
 
-  const handleOpenUrl = (url: string, itemId: string) => {
+  // Fixed: removed unused itemId parameter
+  const handleOpenUrl = (url: string) => {
     window.open(url, '_blank');
     // Note: lastAccessedAt tracking would need to be added to Knowledge type
   };
 
   const renderKnowledgeCard = (item: any) => {
-    const Icon = sourceTypeIcons[item.category as SourceType] || Link;
-    const colorClass = sourceTypeColors[item.category as SourceType] || 'text-[var(--subtle)]';
+    // Fixed: handle undefined category with fallback
+    const category = item.category || 'other';
+    const Icon = sourceTypeIcons[category as SourceType] || Link;
+    const colorClass = sourceTypeColors[category as SourceType] || 'text-[var(--subtle)]';
     
     return (
       <div
@@ -102,7 +105,7 @@ export default function KnowledgeRepository() {
                 <p className="text-sm text-muted mb-2">{item.content}</p>
               )}
               <div className="flex items-center gap-2 text-xs text-muted">
-                <span>{item.category || 'other'}</span>
+                <span>{category}</span>
                 <span>•</span>
                 <span>Accessed {dayjs(item.lastAccessedAt || item.createdAt).fromNow()}</span>
               </div>
@@ -120,14 +123,14 @@ export default function KnowledgeRepository() {
 
         <div className="flex items-center justify-between">
           <button
-            onClick={() => handleOpenUrl(item.content, item.id)}
+            onClick={() => handleOpenUrl(item.content)}
             className="btn btn-ghost text-sm flex items-center gap-2"
           >
             <ExternalLink size={14} />
             Open
           </button>
           <span className="text-xs text-muted capitalize">
-            {item.category || 'other'}
+            {category}
           </span>
         </div>
       </div>
@@ -199,11 +202,11 @@ export default function KnowledgeRepository() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems.map((item: any) => renderKnowledgeCard(item))}
-        </div>
-
-        {filteredItems.length === 0 && (
+        {filteredItems.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredItems.map(renderKnowledgeCard)}
+          </div>
+        ) : (
           <div className="text-center text-muted py-12">
             {searchQuery || filterType || filterTag ? 'No knowledge items match your filters' : 'No knowledge items yet'}
           </div>
@@ -234,24 +237,35 @@ export default function KnowledgeRepository() {
                 className="input w-full"
               />
               
+              <textarea
+                placeholder="Description (optional)..."
+                value={newItem.description}
+                onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                className="input w-full h-20 resize-none"
+              />
+              
               <select
                 value={newItem.sourceType}
                 onChange={(e) => setNewItem({ ...newItem, sourceType: e.target.value as SourceType })}
                 className="input w-full"
               >
                 <option value="other">Other</option>
-                <option value="howto">How-to Guide</option>
+                <option value="howto">How-to</option>
                 <option value="article">Article</option>
                 <option value="docs">Documentation</option>
                 <option value="github">GitHub</option>
                 <option value="video">Video</option>
               </select>
               
-              <textarea
-                placeholder="Description (optional)..."
-                value={newItem.description}
-                onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-                className="input w-full h-20 resize-none"
+              <input
+                type="text"
+                placeholder="Tags (comma-separated)..."
+                value={newItem.tags.join(', ')}
+                onChange={(e) => setNewItem({ 
+                  ...newItem, 
+                  tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                })}
+                className="input w-full"
               />
             </div>
             
